@@ -12,7 +12,7 @@ CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 ICONSET_DIR="$BUILD_DIR/AppIcon.iconset"
-MASTER_ICON="$ROOT_DIR/Assets/AppIcon.svg"
+MASTER_ICON="$ROOT_DIR/Assets/AppIcon.png"
 MASTER_PNG="$BUILD_DIR/AppIcon-1024.png"
 ICNS_PATH="$RESOURCES_DIR/AppIcon.icns"
 RELEASE_EXECUTABLE="$ROOT_DIR/.build/release/$EXECUTABLE_NAME"
@@ -24,8 +24,7 @@ rm -rf "$APP_DIR" "$ICONSET_DIR"
 swift build -c release --package-path "$ROOT_DIR"
 
 mkdir -p "$ICONSET_DIR"
-qlmanage -t -s 1024 -o "$BUILD_DIR" "$MASTER_ICON" >/dev/null 2>&1
-mv "$BUILD_DIR/$(basename "$MASTER_ICON").png" "$MASTER_PNG"
+sips -z 1024 1024 "$MASTER_ICON" --out "$MASTER_PNG" >/dev/null
 
 create_icon() {
   local size="$1"
