@@ -36,8 +36,9 @@ final class WorkspaceStore: ObservableObject {
     private let collapsedSidebarWidth: CGFloat = 0
 
     var favoriteFiles: [FileTreeNode] {
-        favoriteFileURLs.map { url in
-            FileTreeNode(
+        favoriteFileURLs.compactMap { url in
+            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            return FileTreeNode(
                 id: "favorite:\(url.path)",
                 name: url.lastPathComponent,
                 kind: .file,
@@ -534,7 +535,6 @@ final class WorkspaceStore: ObservableObject {
     private func restorePersistentState() {
         favoriteFileURLs = (defaults.stringArray(forKey: StorageKey.favoriteFiles) ?? [])
             .map(URL.init(fileURLWithPath:))
-            .filter { FileManager.default.fileExists(atPath: $0.path) }
 
         recentFileURLs = (defaults.stringArray(forKey: StorageKey.recentFiles) ?? [])
             .map(URL.init(fileURLWithPath:))

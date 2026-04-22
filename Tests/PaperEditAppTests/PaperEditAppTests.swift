@@ -140,6 +140,39 @@ import Testing
 }
 
 @MainActor
+@Test func unavailableFavoritesStayPersistedAcrossRestoreAndPersist() throws {
+    let suiteName = "PaperEditTests-\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+        Issue.record("Expected isolated defaults suite")
+        return
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let favoriteURL = tempDirectory.appendingPathComponent("missing-okay.json")
+    try #"{"theme":"paper"}"#.write(to: favoriteURL, atomically: true, encoding: .utf8)
+
+    let firstStore = WorkspaceStore(defaults: defaults)
+    firstStore.toggleFavorite(favoriteURL)
+    try FileManager.default.removeItem(at: favoriteURL)
+
+    let secondStore = WorkspaceStore(defaults: defaults)
+    #expect(secondStore.favoriteFileURLs == [favoriteURL])
+    #expect(secondStore.favoriteFiles.isEmpty)
+
+    let otherURL = tempDirectory.appendingPathComponent("other.json")
+    try #"{"other":true}"#.write(to: otherURL, atomically: true, encoding: .utf8)
+    secondStore.openExternalFiles([otherURL])
+
+    #expect(defaults.stringArray(forKey: "paperedit.favorite-files") == [favoriteURL.path])
+    #expect(secondStore.favoriteFileURLs == [favoriteURL])
+}
+
+@MainActor
 @Test func toggleFavoriteRemovesItAndUpdatesFavoriteState() throws {
     let suiteName = "PaperEditTests-\(UUID().uuidString)"
     guard let defaults = UserDefaults(suiteName: suiteName) else {
