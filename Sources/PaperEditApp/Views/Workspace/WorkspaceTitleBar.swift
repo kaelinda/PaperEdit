@@ -163,16 +163,22 @@ private struct ToolbarIconButton: View {
     let symbol: String
     let theme: PaperTheme
     let action: () -> Void
+    @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .medium))
-                .frame(width: 28, height: 28)
-                .foregroundStyle(theme.textMuted)
+                .frame(width: 32, height: 32)
+                .foregroundStyle(hovering ? theme.textPrimary : theme.textMuted)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(hovering ? theme.hover : .clear)
+                )
         }
         .buttonStyle(.plain)
-        .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .onHover { hovering = $0 }
     }
 }
 
@@ -259,7 +265,8 @@ private struct TabItemView: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(theme.textMuted)
-                        .frame(width: 16, height: 16)
+                        .frame(width: 18, height: 18)
+                        .background(theme.hover, in: Circle())
                 }
                 .buttonStyle(.plain)
                 .padding(.trailing, 8)

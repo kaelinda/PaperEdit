@@ -64,14 +64,18 @@ struct EmptyStateView: View {
 
             shortcutGrid(isCompact: isCompact)
 
-            Label("Supports Markdown, JSON, YAML, TOML, and more", systemImage: "square.and.arrow.down.on.square")
+            Label("Markdown, JSON, YAML, TOML, XML", systemImage: "doc.text")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(theme.textMuted)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 10)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(theme.elevatedBackground)
+                )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(theme.border, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    Capsule(style: .continuous)
+                        .stroke(theme.border, lineWidth: 1)
                 )
                 .fixedSize(horizontal: false, vertical: true)
         }

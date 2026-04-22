@@ -96,12 +96,17 @@ struct CommandPaletteView: View {
                         theme.elevatedBackground.opacity(0.72)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(theme.border, lineWidth: 1)
                 )
-                .shadow(color: .black.opacity(0.12), radius: 16, y: 8)
+                .overlay(alignment: .top) {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(.white.opacity(0.12), lineWidth: 1)
+                        .blendMode(.screen)
+                }
+                .shadow(color: .black.opacity(0.16), radius: 24, y: 14)
                 .padding(.top, proxy.size.height * 0.18)
             }
         }
@@ -133,6 +138,7 @@ private struct CommandPaletteRow: View {
     let showsCategory: Bool
     let theme: PaperTheme
     let action: () -> Void
+    @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
@@ -168,12 +174,13 @@ private struct CommandPaletteRow: View {
                 }
             }
             .padding(.horizontal, 12)
-            .frame(height: 38)
+            .frame(height: 40)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(isSelected ? theme.accent.opacity(0.82) : .clear)
+                    .fill(isSelected ? theme.accent.opacity(0.82) : hovering ? theme.hover : .clear)
             )
         }
         .buttonStyle(.plain)
+        .onHover { hovering = $0 }
     }
 }

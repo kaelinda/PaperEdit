@@ -19,9 +19,9 @@ struct PaperTheme {
     var success: Color
 
     static let light = PaperTheme(
-        windowBackground: Color(hex: "#FAFAFA"),
+        windowBackground: Color(hex: "#F5F5F7"),
         editorBackground: Color(hex: "#FFFFFF"),
-        sidebarBackground: Color(hex: "#F6F5F3"),
+        sidebarBackground: Color(hex: "#F2F2F7"),
         elevatedBackground: Color(hex: "#FFFFFF"),
         textPrimary: Color(hex: "#1D1D1F"),
         textMuted: Color(hex: "#5F6066"),
@@ -38,11 +38,11 @@ struct PaperTheme {
     )
 
     static let dark = PaperTheme(
-        windowBackground: Color(hex: "#1E1E1E"),
-        editorBackground: Color(hex: "#252526"),
-        sidebarBackground: Color(hex: "#202122"),
-        elevatedBackground: Color(hex: "#2A2B2D"),
-        textPrimary: Color(hex: "#E4E4E4"),
+        windowBackground: Color(hex: "#1C1C1E"),
+        editorBackground: Color(hex: "#202124"),
+        sidebarBackground: Color(hex: "#1E1F22"),
+        elevatedBackground: Color(hex: "#2C2C2E"),
+        textPrimary: Color(hex: "#F2F2F7"),
         textMuted: Color(hex: "#B5B5BA"),
         textSubtle: Color(hex: "#8E8E93"),
         accent: AccentSwatch.blue.interfaceColor,
