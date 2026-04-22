@@ -37,6 +37,11 @@ struct PaperEditCommands: Commands {
         }
 
         CommandMenu("View") {
+            Button("Quick Open") {
+                workspaceStore.openQuickOpen()
+            }
+            .keyboardShortcut("p")
+
             Button("Command Palette") {
                 workspaceStore.openCommandPalette()
             }
