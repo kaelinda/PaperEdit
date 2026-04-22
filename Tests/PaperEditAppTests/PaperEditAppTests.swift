@@ -92,8 +92,9 @@ import Testing
     let store = WorkspaceStore(defaults: defaults)
     store.workspaceRootURL = tempDirectory
     store.openExternalFiles([externalConfig])
+    store.openQuickOpen(prefill: "project")
 
-    let results = store.quickOpenItems(matching: "project")
+    let results = store.quickOpenItems()
     #expect(results.map { $0.sourceURL.resolvingSymlinksInPath().path } == [workspaceConfig.resolvingSymlinksInPath().path, externalConfig.resolvingSymlinksInPath().path])
     #expect(results.map(\.source) == [.workspace, .recent])
 }
@@ -123,6 +124,60 @@ import Testing
 
     #expect(store.openTabs.count == 1)
     #expect(store.activeTabID == existingTabID)
+}
+
+@MainActor
+@Test func quickOpenStateIsMutuallyExclusiveWithCommandPaletteAndSceneChanges() {
+    let store = WorkspaceStore()
+
+    store.openQuickOpen(prefill: "draft")
+    #expect(store.showQuickOpen == true)
+    #expect(store.showCommandPalette == false)
+    #expect(store.quickOpenModel.query == "draft")
+
+    store.openCommandPalette(prefill: "theme")
+    #expect(store.showQuickOpen == false)
+    #expect(store.showCommandPalette == true)
+    #expect(store.quickOpenModel.query.isEmpty)
+    #expect(store.commandPaletteModel.query == "theme")
+
+    store.openQuickOpen(prefill: "notes")
+    #expect(store.showQuickOpen == true)
+    #expect(store.showCommandPalette == false)
+    #expect(store.commandPaletteModel.query.isEmpty)
+    #expect(store.quickOpenModel.query == "notes")
+
+    store.apply(scene: .darkJSON)
+    #expect(store.showQuickOpen == false)
+    #expect(store.showCommandPalette == false)
+}
+
+@MainActor
+@Test func quickOpenWorkspaceIndexRefreshesWhenWorkspaceRootChanges() throws {
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let firstWorkspace = tempDirectory.appendingPathComponent("workspace-a")
+    let secondWorkspace = tempDirectory.appendingPathComponent("workspace-b")
+    try FileManager.default.createDirectory(at: firstWorkspace, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: secondWorkspace, withIntermediateDirectories: true)
+
+    let firstConfig = firstWorkspace.appendingPathComponent("project.json")
+    let secondConfig = secondWorkspace.appendingPathComponent("project.json")
+    try "{}".write(to: firstConfig, atomically: true, encoding: .utf8)
+    try "{}".write(to: secondConfig, atomically: true, encoding: .utf8)
+
+    let store = WorkspaceStore()
+    store.workspaceRootURL = firstWorkspace
+    store.openQuickOpen()
+
+    let firstResults = store.quickOpenItems(matching: "project")
+    #expect(firstResults.map { $0.sourceURL.resolvingSymlinksInPath().path } == [firstConfig.resolvingSymlinksInPath().path])
+
+    store.workspaceRootURL = secondWorkspace
+    let secondResults = store.quickOpenItems(matching: "project")
+    #expect(secondResults.map { $0.sourceURL.resolvingSymlinksInPath().path } == [secondConfig.resolvingSymlinksInPath().path])
 }
 
 @MainActor

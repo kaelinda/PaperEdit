@@ -24,13 +24,19 @@ final class WorkspaceStore: ObservableObject {
     @Published var accentSwatch: AccentSwatch = .blue
     @Published var sidebarSections: Set<SidebarSection> = Set(SidebarSection.allCases)
     @Published var expandedNodeIDs: Set<String> = []
-    @Published var workspaceRootURL: URL?
+    @Published var workspaceRootURL: URL? {
+        didSet {
+            refreshWorkspaceFileIndex()
+        }
+    }
     @Published var favoriteFileURLs: [URL] = []
     @Published var recentFileURLs: [URL] = []
 
     let commandPaletteModel = CommandPaletteModel()
     let quickOpenModel = QuickOpenModel()
     private let defaults: UserDefaults
+    private var workspaceFileIndexRootPath: String?
+    private var workspaceFileIndex: [URL] = []
 
     private var untitledIndex = 1
     private let minSidebarWidth: CGFloat = 200
@@ -87,6 +93,7 @@ final class WorkspaceStore: ObservableObject {
 
     func apply(scene: DemoScene) {
         activeScene = scene
+        closeQuickOpen()
         showCommandPalette = false
         showSettings = false
 
@@ -380,6 +387,7 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func openCommandPalette(prefill: String = "") {
+        closeQuickOpen()
         showCommandPalette = true
         commandPaletteModel.reset()
         commandPaletteModel.query = prefill
@@ -391,9 +399,11 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func openQuickOpen(prefill: String = "") {
+        closeCommandPalette()
         showQuickOpen = true
         quickOpenModel.reset()
         quickOpenModel.query = prefill
+        refreshWorkspaceFileIndex()
     }
 
     func closeQuickOpen() {
@@ -402,12 +412,13 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func quickOpenItems(matching rawQuery: String? = nil) -> [QuickOpenItem] {
+        ensureWorkspaceFileIndexIsCurrent()
         let query = (rawQuery ?? quickOpenModel.query)
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         var seenPaths = Set<String>()
 
-        let workspaceMatches = collectWorkspaceFileURLs()
+        let workspaceMatches = workspaceFileIndex
             .filter { query.isEmpty || $0.lastPathComponent.lowercased().contains(query) }
             .compactMap { url -> QuickOpenItem? in
                 guard seenPaths.insert(normalizedFilePath(for: url)).inserted else { return nil }
@@ -613,6 +624,7 @@ final class WorkspaceStore: ObservableObject {
         activeScene = .emptyState
         openTabs = []
         activeTabID = nil
+        refreshWorkspaceFileIndex()
         refreshStatus()
     }
 
@@ -628,6 +640,31 @@ final class WorkspaceStore: ObservableObject {
     private func collectWorkspaceFileURLs() -> [URL] {
         guard let workspaceRootURL else { return [] }
         return collectWorkspaceFileURLs(in: workspaceRootURL, depth: 0)
+    }
+
+    private func ensureWorkspaceFileIndexIsCurrent() {
+        guard let workspaceRootURL else {
+            if !workspaceFileIndex.isEmpty {
+                refreshWorkspaceFileIndex()
+            }
+            return
+        }
+
+        let rootPath = normalizedFilePath(for: workspaceRootURL)
+        if workspaceFileIndexRootPath != rootPath || workspaceFileIndex.isEmpty {
+            refreshWorkspaceFileIndex()
+        }
+    }
+
+    private func refreshWorkspaceFileIndex() {
+        guard let workspaceRootURL else {
+            workspaceFileIndexRootPath = nil
+            workspaceFileIndex = []
+            return
+        }
+
+        workspaceFileIndexRootPath = normalizedFilePath(for: workspaceRootURL)
+        workspaceFileIndex = collectWorkspaceFileURLs()
     }
 
     private func collectWorkspaceFileURLs(in directoryURL: URL, depth: Int) -> [URL] {

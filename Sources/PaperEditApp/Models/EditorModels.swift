@@ -410,12 +410,28 @@ enum QuickOpenItemSource: String, Hashable {
 }
 
 struct QuickOpenItem: Identifiable, Hashable {
-    let id = UUID()
+    let id: String
     var title: String
     var subtitle: String
     var sourceURL: URL
     var format: EditorFileFormat
     var source: QuickOpenItemSource
+
+    init(
+        id: String? = nil,
+        title: String,
+        subtitle: String,
+        sourceURL: URL,
+        format: EditorFileFormat,
+        source: QuickOpenItemSource
+    ) {
+        self.id = id ?? sourceURL.resolvingSymlinksInPath().standardizedFileURL.path
+        self.title = title
+        self.subtitle = subtitle
+        self.sourceURL = sourceURL
+        self.format = format
+        self.source = source
+    }
 }
 
 @MainActor
