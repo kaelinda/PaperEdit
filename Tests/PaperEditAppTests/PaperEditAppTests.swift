@@ -69,6 +69,63 @@ import Testing
 }
 
 @MainActor
+@Test func quickOpenResultsPreferWorkspaceFilesBeforeRecentFallbacks() throws {
+    let suiteName = "PaperEditTests-\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+        Issue.record("Expected isolated defaults suite")
+        return
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let workspaceConfig = tempDirectory.appendingPathComponent("project.json")
+    let externalConfig = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString)-project.json")
+    defer { try? FileManager.default.removeItem(at: externalConfig) }
+
+    try "{}".write(to: workspaceConfig, atomically: true, encoding: .utf8)
+    try "{}".write(to: externalConfig, atomically: true, encoding: .utf8)
+
+    let store = WorkspaceStore(defaults: defaults)
+    store.workspaceRootURL = tempDirectory
+    store.openExternalFiles([externalConfig])
+
+    let results = store.quickOpenItems(matching: "project")
+    #expect(results.map { $0.sourceURL.resolvingSymlinksInPath().path } == [workspaceConfig.resolvingSymlinksInPath().path, externalConfig.resolvingSymlinksInPath().path])
+    #expect(results.map(\.source) == [.workspace, .recent])
+}
+
+@MainActor
+@Test func openingQuickOpenItemFocusesExistingTabInsteadOfDuplicatingIt() throws {
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let configURL = tempDirectory.appendingPathComponent("settings.yaml")
+    try "theme: paperedit\n".write(to: configURL, atomically: true, encoding: .utf8)
+
+    let store = WorkspaceStore()
+    store.workspaceRootURL = tempDirectory
+    store.openExternalFiles([configURL])
+    let existingTabID = store.activeTabID
+
+    let item = QuickOpenItem(
+        title: "settings.yaml",
+        subtitle: tempDirectory.path,
+        sourceURL: configURL,
+        format: .yaml,
+        source: .workspace
+    )
+    store.openQuickOpenItem(item)
+
+    #expect(store.openTabs.count == 1)
+    #expect(store.activeTabID == existingTabID)
+}
+
+@MainActor
 @Test func savesDirtyExternalFiles() throws {
     let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)

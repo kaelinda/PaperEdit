@@ -15,6 +15,7 @@ final class WorkspaceStore: ObservableObject {
     @Published var themeMode: ThemePalette = .light
     @Published var viewMode: EditorViewMode = .split
     @Published var showCommandPalette = false
+    @Published var showQuickOpen = false
     @Published var showSettings = false
     @Published var activeScene: DemoScene = .lightMarkdownSplit
     @Published var status = EditorStatus.empty
@@ -28,6 +29,7 @@ final class WorkspaceStore: ObservableObject {
     @Published var recentFileURLs: [URL] = []
 
     let commandPaletteModel = CommandPaletteModel()
+    let quickOpenModel = QuickOpenModel()
     private let defaults: UserDefaults
 
     private var untitledIndex = 1
@@ -175,7 +177,7 @@ final class WorkspaceStore: ObservableObject {
 
     func openExternalFiles(_ urls: [URL]) {
         for url in urls {
-            if let existing = openTabs.first(where: { $0.sourceURL == url }) {
+            if let existing = openTabs.first(where: { isSameFileURL($0.sourceURL, url) }) {
                 activeTabID = existing.id
                 continue
             }
@@ -388,6 +390,57 @@ final class WorkspaceStore: ObservableObject {
         commandPaletteModel.reset()
     }
 
+    func openQuickOpen(prefill: String = "") {
+        showQuickOpen = true
+        quickOpenModel.reset()
+        quickOpenModel.query = prefill
+    }
+
+    func closeQuickOpen() {
+        showQuickOpen = false
+        quickOpenModel.reset()
+    }
+
+    func quickOpenItems(matching rawQuery: String? = nil) -> [QuickOpenItem] {
+        let query = (rawQuery ?? quickOpenModel.query)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        var seenPaths = Set<String>()
+
+        let workspaceMatches = collectWorkspaceFileURLs()
+            .filter { query.isEmpty || $0.lastPathComponent.lowercased().contains(query) }
+            .compactMap { url -> QuickOpenItem? in
+                guard seenPaths.insert(normalizedFilePath(for: url)).inserted else { return nil }
+                return QuickOpenItem(
+                    title: url.lastPathComponent,
+                    subtitle: url.deletingLastPathComponent().path,
+                    sourceURL: url,
+                    format: EditorFileFormat(fileURL: url),
+                    source: .workspace
+                )
+            }
+
+        let recentMatches = recentFileURLs
+            .filter { query.isEmpty || $0.lastPathComponent.lowercased().contains(query) }
+            .compactMap { url -> QuickOpenItem? in
+                guard seenPaths.insert(normalizedFilePath(for: url)).inserted else { return nil }
+                return QuickOpenItem(
+                    title: url.lastPathComponent,
+                    subtitle: url.deletingLastPathComponent().path,
+                    sourceURL: url,
+                    format: EditorFileFormat(fileURL: url),
+                    source: .recent
+                )
+            }
+
+        return workspaceMatches + recentMatches
+    }
+
+    func openQuickOpenItem(_ item: QuickOpenItem) {
+        openExternalFiles([item.sourceURL])
+        closeQuickOpen()
+    }
+
     func filteredCommands() -> [CommandItem] {
         let items = commandItems()
         guard !commandPaletteModel.query.isEmpty else { return items }
@@ -520,10 +573,19 @@ final class WorkspaceStore: ObservableObject {
     }
 
     private func noteRecentFile(_ url: URL) {
-        recentFileURLs.removeAll { $0 == url }
+        recentFileURLs.removeAll { isSameFileURL($0, url) }
         recentFileURLs.insert(url, at: 0)
         recentFileURLs = Array(recentFileURLs.prefix(12))
         NSDocumentController.shared.noteNewRecentDocumentURL(url)
+    }
+
+    private func isSameFileURL(_ lhs: URL?, _ rhs: URL) -> Bool {
+        guard let lhs else { return false }
+        return normalizedFilePath(for: lhs) == normalizedFilePath(for: rhs)
+    }
+
+    private func normalizedFilePath(for url: URL) -> String {
+        url.resolvingSymlinksInPath().standardizedFileURL.path
     }
 
     private func persistState() {
@@ -561,6 +623,37 @@ final class WorkspaceStore: ObservableObject {
             sourceURL: url,
             children: buildChildren(for: url, depth: 0)
         )
+    }
+
+    private func collectWorkspaceFileURLs() -> [URL] {
+        guard let workspaceRootURL else { return [] }
+        return collectWorkspaceFileURLs(in: workspaceRootURL, depth: 0)
+    }
+
+    private func collectWorkspaceFileURLs(in directoryURL: URL, depth: Int) -> [URL] {
+        guard depth < 4 else { return [] }
+
+        let keys: Set<URLResourceKey> = [.isDirectoryKey, .isRegularFileKey, .isHiddenKey]
+        guard let urls = try? FileManager.default.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: Array(keys),
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        return urls
+            .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
+            .flatMap { url -> [URL] in
+                guard let values = try? url.resourceValues(forKeys: keys), values.isHidden != true else { return [] }
+                if values.isDirectory == true {
+                    guard ![".git", ".build", "node_modules", ".swiftpm", "DerivedData"].contains(url.lastPathComponent) else {
+                        return []
+                    }
+                    return collectWorkspaceFileURLs(in: url, depth: depth + 1)
+                }
+                return values.isRegularFile == true ? [url] : []
+            }
     }
 
     private func buildChildren(for directoryURL: URL, depth: Int) -> [FileTreeNode] {

@@ -395,6 +395,29 @@ struct CommandItem: Identifiable, Hashable {
     }
 }
 
+enum QuickOpenItemSource: String, Hashable {
+    case workspace
+    case recent
+
+    var label: String {
+        switch self {
+        case .workspace:
+            "Workspace"
+        case .recent:
+            "Recent"
+        }
+    }
+}
+
+struct QuickOpenItem: Identifiable, Hashable {
+    let id = UUID()
+    var title: String
+    var subtitle: String
+    var sourceURL: URL
+    var format: EditorFileFormat
+    var source: QuickOpenItemSource
+}
+
 @MainActor
 final class SettingsWindowModel: ObservableObject {
     @Published var selectedPane: PreferencePane = .appearance
@@ -413,6 +436,17 @@ final class CommandPaletteModel: ObservableObject {
 
         selectedIndex = max(0, min(itemCount - 1, selectedIndex + delta))
     }
+
+    func reset() {
+        query = ""
+        selectedIndex = 0
+    }
+}
+
+@MainActor
+final class QuickOpenModel: ObservableObject {
+    @Published var query = ""
+    @Published var selectedIndex = 0
 
     func reset() {
         query = ""
