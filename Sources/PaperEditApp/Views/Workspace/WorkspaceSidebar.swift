@@ -127,7 +127,7 @@ private struct SidebarSectionView: View {
                 HStack(spacing: 6) {
                     Image(systemName: workspaceStore.sidebarSections.contains(section) ? "chevron.down" : "chevron.right")
                         .font(.system(size: 9, weight: .bold))
-                    Text(section.title.uppercased())
+                    Text(section.title)
                         .font(.system(size: 10, weight: .semibold))
                         .tracking(0.6)
                     Spacer()
