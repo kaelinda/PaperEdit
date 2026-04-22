@@ -1,0 +1,59 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="84" x2="904" y2="940" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F1F3F8"/>
+    </linearGradient>
+    <linearGradient id="paperFace" x1="182" y1="138" x2="823" y2="906" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F8F9FC"/>
+    </linearGradient>
+    <linearGradient id="foldFace" x1="640" y1="138" x2="826" y2="324" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#ECEFF5"/>
+    </linearGradient>
+    <filter id="outerShadow" x="-40" y="-40" width="1104" height="1104" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="36" flood-color="#B8C0D2" flood-opacity="0.28"/>
+    </filter>
+    <filter id="paperShadow" x="122" y="114" width="730" height="826" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="20" stdDeviation="28" flood-color="#919DB4" flood-opacity="0.22"/>
+    </filter>
+    <filter id="foldShadow" x="604" y="116" width="256" height="228" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#B0B8C8" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#outerShadow)">
+    <rect x="18" y="18" width="988" height="988" rx="210" fill="url(#bg)"/>
+    <rect x="18" y="18" width="988" height="988" rx="210" stroke="#D8DCE5" stroke-width="4"/>
+  </g>
+
+  <g filter="url(#paperShadow)">
+    <path d="M206 138H640L824 322V840C824 865.405 803.405 886 778 886H206C180.595 886 160 865.405 160 840V184C160 158.595 180.595 138 206 138Z" fill="url(#paperFace)"/>
+    <path d="M206 138H640L824 322V840C824 865.405 803.405 886 778 886H206C180.595 886 160 865.405 160 840V184C160 158.595 180.595 138 206 138Z" stroke="#E0E4EB" stroke-width="2"/>
+  </g>
+
+  <g filter="url(#foldShadow)">
+    <path d="M640 138L824 322H686C660.595 322 640 301.405 640 276V138Z" fill="url(#foldFace)"/>
+    <path d="M640 138L824 322H686C660.595 322 640 301.405 640 276V138Z" stroke="#EFF2F8" stroke-width="2"/>
+  </g>
+
+  <rect x="292" y="296" width="206" height="38" rx="19" fill="#2F80ED"/>
+  <rect x="516" y="296" width="70" height="38" rx="19" fill="#DBDDE4"/>
+
+  <rect x="292" y="382" width="320" height="38" rx="19" fill="#FFCC11"/>
+
+  <rect x="292" y="468" width="252" height="38" rx="19" fill="#B24EE7"/>
+  <rect x="562" y="468" width="112" height="38" rx="19" fill="#DBDDE4"/>
+
+  <rect x="292" y="554" width="342" height="38" rx="19" fill="#36D344"/>
+
+  <rect x="292" y="640" width="160" height="38" rx="19" fill="#FF930F"/>
+  <rect x="470" y="640" width="204" height="38" rx="19" fill="#DBDDE4"/>
+
+  <rect x="292" y="726" width="230" height="38" rx="19" fill="#FF2D55"/>
+  <rect x="540" y="726" width="150" height="38" rx="19" fill="#DBDDE4"/>
+
+  <rect x="292" y="808" width="398" height="20" rx="10" fill="#D9DCE4"/>
+  <rect x="292" y="846" width="308" height="20" rx="10" fill="#D9DCE4"/>
+</svg>
