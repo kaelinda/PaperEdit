@@ -36,7 +36,7 @@ struct WorkspaceSidebar: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    SidebarSectionView(theme: theme, section: .pinned, nodes: filtered(nodes: workspaceStore.pinnedFiles))
+                    SidebarSectionView(theme: theme, section: .favorites, nodes: filtered(nodes: workspaceStore.favoriteFiles))
                     SidebarSectionView(theme: theme, section: .recent, nodes: filtered(nodes: workspaceStore.recentProjects))
                     SidebarSectionView(
                         theme: theme,
@@ -193,8 +193,8 @@ private struct SidebarSectionView: View {
 
     private var emptyStateCopy: String {
         switch section {
-        case .pinned:
-            "No open documents."
+        case .favorites:
+            "No favorites yet."
         case .recent:
             "Files you open will appear here."
         case .explorer:

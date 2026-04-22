@@ -150,7 +150,7 @@ enum EditorViewMode: String, CaseIterable, Codable {
 }
 
 enum SidebarSection: String, CaseIterable, Codable, Identifiable {
-    case pinned
+    case favorites
     case recent
     case explorer
 
@@ -158,19 +158,21 @@ enum SidebarSection: String, CaseIterable, Codable, Identifiable {
 
     var title: String {
         switch self {
-        case .pinned: "Open Tabs"
-        case .recent: "Recent Files"
-        case .explorer: "Workspace"
+        case .favorites: "Favorites"
+        case .recent: "Recent"
+        case .explorer: "Explorer"
         }
     }
 
     var iconName: String {
         switch self {
-        case .pinned: "doc.on.doc"
+        case .favorites: "star"
         case .recent: "clock.arrow.circlepath"
         case .explorer: "folder"
         }
     }
+
+    static var pinned: SidebarSection { .favorites }
 }
 
 enum PreferencePane: String, CaseIterable, Codable, Identifiable {

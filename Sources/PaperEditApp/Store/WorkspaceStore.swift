@@ -4,6 +4,7 @@ import Foundation
 @MainActor
 final class WorkspaceStore: ObservableObject {
     private enum StorageKey {
+        static let favoriteFiles = "paperedit.favorite-files"
         static let recentFiles = "paperedit.recent-files"
         static let workspaceRoot = "paperedit.workspace-root"
     }
@@ -23,26 +24,30 @@ final class WorkspaceStore: ObservableObject {
     @Published var sidebarSections: Set<SidebarSection> = Set(SidebarSection.allCases)
     @Published var expandedNodeIDs: Set<String> = []
     @Published var workspaceRootURL: URL?
+    @Published var favoriteFileURLs: [URL] = []
     @Published var recentFileURLs: [URL] = []
 
     let commandPaletteModel = CommandPaletteModel()
+    private let defaults: UserDefaults
 
     private var untitledIndex = 1
     private let minSidebarWidth: CGFloat = 200
     private let maxSidebarWidth: CGFloat = 320
     private let collapsedSidebarWidth: CGFloat = 0
 
-    var pinnedFiles: [FileTreeNode] {
-        openTabs.map { tab in
+    var favoriteFiles: [FileTreeNode] {
+        favoriteFileURLs.map { url in
             FileTreeNode(
-                id: tab.sourceURL?.path ?? "tab:\(tab.id.uuidString)",
-                name: tab.name,
+                id: "favorite:\(url.path)",
+                name: url.lastPathComponent,
                 kind: .file,
-                format: tab.format,
-                sourceURL: tab.sourceURL
+                format: EditorFileFormat(fileURL: url),
+                sourceURL: url
             )
         }
     }
+
+    var pinnedFiles: [FileTreeNode] { favoriteFiles }
 
     var recentProjects: [FileTreeNode] {
         recentFileURLs.map { url in
@@ -74,7 +79,8 @@ final class WorkspaceStore: ObservableObject {
         openTabs.contains(where: \.isDirty)
     }
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         restorePersistentState()
     }
 
@@ -242,6 +248,19 @@ final class WorkspaceStore: ObservableObject {
         } else {
             sidebarSections.insert(section)
         }
+    }
+
+    func toggleFavorite(_ url: URL) {
+        if let existingIndex = favoriteFileURLs.firstIndex(of: url) {
+            favoriteFileURLs.remove(at: existingIndex)
+        } else {
+            favoriteFileURLs.insert(url, at: 0)
+        }
+        persistState()
+    }
+
+    func isFavorite(_ url: URL) -> Bool {
+        favoriteFileURLs.contains(url)
     }
 
     func toggleNodeExpansion(_ id: String) {
@@ -509,13 +528,16 @@ final class WorkspaceStore: ObservableObject {
     }
 
     private func persistState() {
-        let defaults = UserDefaults.standard
+        defaults.set(favoriteFileURLs.map(\.path), forKey: StorageKey.favoriteFiles)
         defaults.set(recentFileURLs.map(\.path), forKey: StorageKey.recentFiles)
         defaults.set(workspaceRootURL?.path, forKey: StorageKey.workspaceRoot)
     }
 
     private func restorePersistentState() {
-        let defaults = UserDefaults.standard
+        favoriteFileURLs = (defaults.stringArray(forKey: StorageKey.favoriteFiles) ?? [])
+            .map(URL.init(fileURLWithPath:))
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+
         recentFileURLs = (defaults.stringArray(forKey: StorageKey.recentFiles) ?? [])
             .map(URL.init(fileURLWithPath:))
             .filter { FileManager.default.fileExists(atPath: $0.path) }

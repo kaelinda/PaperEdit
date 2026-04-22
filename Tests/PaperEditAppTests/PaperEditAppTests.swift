@@ -88,6 +88,58 @@ import Testing
 }
 
 @MainActor
+@Test func favoritesPersistAcrossStoreInstances() throws {
+    let suiteName = "PaperEditTests-\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+        Issue.record("Expected isolated defaults suite")
+        return
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let configURL = tempDirectory.appendingPathComponent("settings.json")
+    try #"{"theme":"paper"}"#.write(to: configURL, atomically: true, encoding: .utf8)
+
+    let firstStore = WorkspaceStore(defaults: defaults)
+    firstStore.openExternalFiles([configURL])
+    firstStore.toggleFavorite(configURL)
+
+    let secondStore = WorkspaceStore(defaults: defaults)
+    #expect(secondStore.favoriteFileURLs == [configURL])
+    #expect(secondStore.recentFileURLs == [configURL])
+}
+
+@MainActor
+@Test func favoriteFilesAreIndependentFromOpenTabs() throws {
+    let suiteName = "PaperEditTests-\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+        Issue.record("Expected isolated defaults suite")
+        return
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let configURL = tempDirectory.appendingPathComponent("app.toml")
+    try "name = \"paperedit\"\n".write(to: configURL, atomically: true, encoding: .utf8)
+
+    let store = WorkspaceStore(defaults: defaults)
+    store.openExternalFiles([configURL])
+    store.toggleFavorite(configURL)
+    store.closeTab(store.activeTabID!)
+
+    #expect(store.favoriteFileURLs == [configURL])
+    #expect(store.favoriteFiles.map(\.sourceURL) == [configURL])
+}
+
+@MainActor
 @Test func togglesPrimaryJSONFoldState() {
     let store = WorkspaceStore()
     store.apply(scene: .darkJSON)
