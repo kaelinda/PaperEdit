@@ -80,7 +80,8 @@ struct WorkspaceRootView: View {
                         tab: tab,
                         theme: theme,
                         isDark: isDarkTheme,
-                        viewMode: isCompactWidth && workspaceStore.viewMode == .split ? .edit : workspaceStore.viewMode,
+                        viewMode: workspaceStore.viewMode,
+                        isCompactWidth: isCompactWidth,
                         onTextChange: workspaceStore.updateText(_:selection:),
                         onSelectionChange: workspaceStore.updateSelection(_:)
                     )

@@ -11,6 +11,9 @@ struct CommandPaletteView: View {
         let items = workspaceStore.filteredCommands()
 
         GeometryReader { proxy in
+            let paletteWidth = min(560, max(280, proxy.size.width - 48))
+            let isCompact = paletteWidth < 460
+
             ZStack(alignment: .top) {
                 Color.black.opacity(0.05)
                     .ignoresSafeArea()
@@ -50,22 +53,43 @@ struct CommandPaletteView: View {
                     }
 
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 4) {
-                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                CommandPaletteRow(
-                                    item: item,
-                                    isSelected: index == workspaceStore.commandPaletteModel.selectedIndex,
-                                    theme: theme
-                                ) {
-                                    workspaceStore.executeCommand(item, settingsModel: settingsModel)
+                        if items.isEmpty {
+                            VStack(spacing: 10) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 24, weight: .light))
+                                    .foregroundStyle(theme.textSubtle)
+
+                                Text("No commands found")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(theme.textPrimary)
+
+                                Text("Try a different search or press Esc to close.")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(theme.textMuted)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 42)
+                            .padding(.horizontal, 20)
+                        } else {
+                            LazyVStack(alignment: .leading, spacing: 4) {
+                                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                    CommandPaletteRow(
+                                        item: item,
+                                        isSelected: index == workspaceStore.commandPaletteModel.selectedIndex,
+                                        showsCategory: !isCompact,
+                                        theme: theme
+                                    ) {
+                                        workspaceStore.executeCommand(item, settingsModel: settingsModel)
+                                    }
                                 }
                             }
+                            .padding(10)
                         }
-                        .padding(10)
                     }
                     .frame(maxHeight: 318)
                 }
-                .frame(width: 560)
+                .frame(width: paletteWidth)
                 .background {
                     ZStack {
                         VisualEffectBlur(material: .hudWindow)
@@ -106,6 +130,7 @@ struct CommandPaletteView: View {
 private struct CommandPaletteRow: View {
     let item: CommandItem
     let isSelected: Bool
+    let showsCategory: Bool
     let theme: PaperTheme
     let action: () -> Void
 
@@ -124,9 +149,11 @@ private struct CommandPaletteRow: View {
 
                 Spacer(minLength: 10)
 
-                Text(item.category)
-                    .font(.system(size: 12))
-                    .foregroundStyle(isSelected ? theme.accentForeground.opacity(0.82) : theme.textMuted)
+                if showsCategory {
+                    Text(item.category)
+                        .font(.system(size: 12))
+                        .foregroundStyle(isSelected ? theme.accentForeground.opacity(0.82) : theme.textMuted)
+                }
 
                 if let shortcut = item.shortcut {
                     Text(shortcut)

@@ -6,8 +6,10 @@ struct MarkdownPreviewContainer: View {
     let theme: PaperTheme
     let isDark: Bool
     let viewMode: EditorViewMode
+    let isCompactWidth: Bool
     let onTextChange: (String, NSRange) -> Void
     let onSelectionChange: (NSRange) -> Void
+    @State private var compactSplitShowsPreview = false
 
     private var renderedMarkdown: AttributedString {
         let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .full)
@@ -19,12 +21,24 @@ struct MarkdownPreviewContainer: View {
         case .edit:
             editorPane
         case .split:
-            HSplitView {
-                editorPane
-                    .frame(minWidth: 360)
+            if isCompactWidth {
+                VStack(spacing: 0) {
+                    compactSplitSwitcher
 
-                markdownPreview
-                    .frame(minWidth: 360)
+                    if compactSplitShowsPreview {
+                        markdownPreview
+                    } else {
+                        editorPane
+                    }
+                }
+            } else {
+                HSplitView {
+                    editorPane
+                        .frame(minWidth: 360)
+
+                    markdownPreview
+                        .frame(minWidth: 360)
+                }
             }
         case .wysiwyg:
             VStack(alignment: .leading, spacing: 0) {
@@ -46,6 +60,45 @@ struct MarkdownPreviewContainer: View {
 
                 markdownPreview
             }
+        }
+    }
+
+    private var compactSplitSwitcher: some View {
+        HStack(spacing: 8) {
+            Button {
+                compactSplitShowsPreview = false
+            } label: {
+                Label("Edit", systemImage: "square.and.pencil")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(compactSplitShowsPreview ? theme.textMuted : theme.textPrimary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 36)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(compactSplitShowsPreview ? .clear : theme.elevatedBackground)
+                    )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                compactSplitShowsPreview = true
+            } label: {
+                Label("Preview", systemImage: "eye")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(compactSplitShowsPreview ? theme.textPrimary : theme.textMuted)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 36)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(compactSplitShowsPreview ? theme.elevatedBackground : .clear)
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(4)
+        .background(theme.windowBackground)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(theme.border).frame(height: 1)
         }
     }
 
