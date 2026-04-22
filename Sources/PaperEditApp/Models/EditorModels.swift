@@ -464,6 +464,15 @@ final class QuickOpenModel: ObservableObject {
     @Published var query = ""
     @Published var selectedIndex = 0
 
+    func moveSelection(delta: Int, itemCount: Int) {
+        guard itemCount > 0 else {
+            selectedIndex = 0
+            return
+        }
+
+        selectedIndex = max(0, min(itemCount - 1, selectedIndex + delta))
+    }
+
     func reset() {
         query = ""
         selectedIndex = 0

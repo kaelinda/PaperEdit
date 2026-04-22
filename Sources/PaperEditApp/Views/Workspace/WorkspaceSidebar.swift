@@ -206,27 +206,34 @@ private struct FileTreeNodeRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 8) {
-                if isContainer {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(theme.textMuted)
-                        .frame(width: 10)
-                } else {
-                    Spacer()
-                        .frame(width: 10)
+                Button(action: primaryAction) {
+                    HStack(spacing: 8) {
+                        if isContainer {
+                            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(theme.textMuted)
+                                .frame(width: 10)
+                        } else {
+                            Spacer()
+                                .frame(width: 10)
+                        }
+
+                        Image(systemName: iconName)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(iconColor)
+                            .frame(width: 14)
+
+                        Text(node.name)
+                            .lineLimit(1)
+                            .font(.system(size: 12, weight: node.kind == .group || node.kind == .project ? .medium : .regular))
+                            .foregroundStyle(theme.textPrimary.opacity(node.kind == .project ? 0.9 : 1))
+
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
                 }
-
-                Image(systemName: iconName)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(iconColor)
-                    .frame(width: 14)
-
-                Text(node.name)
-                    .lineLimit(1)
-                    .font(.system(size: 12, weight: node.kind == .group || node.kind == .project ? .medium : .regular))
-                    .foregroundStyle(theme.textPrimary.opacity(node.kind == .project ? 0.9 : 1))
-
-                Spacer(minLength: 0)
+                .buttonStyle(.plain)
+                .disabled(node.kind == .project)
 
                 if let sourceURL = node.sourceURL, node.kind == .file, hovering || workspaceStore.isFavorite(sourceURL) {
                     Button {
@@ -251,16 +258,6 @@ private struct FileTreeNodeRow: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(isSelected ? theme.selectedItemStroke : .clear, lineWidth: 1)
             )
-            .onTapGesture {
-                switch node.kind {
-                case .file:
-                    workspaceStore.openFileTreeNode(node)
-                case .folder, .group:
-                    workspaceStore.toggleNodeExpansion(node.id)
-                case .project:
-                    break
-                }
-            }
             .onHover { hovering = $0 }
 
             if isExpanded, !node.children.isEmpty {
@@ -302,6 +299,17 @@ private struct FileTreeNodeRow: View {
             theme.textSubtle
         case .project:
             theme.textPrimary
+        }
+    }
+
+    private func primaryAction() {
+        switch node.kind {
+        case .file:
+            workspaceStore.openFileTreeNode(node)
+        case .folder, .group:
+            workspaceStore.toggleNodeExpansion(node.id)
+        case .project:
+            break
         }
     }
 }

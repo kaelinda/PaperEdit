@@ -63,6 +63,8 @@ struct WorkspaceRootView: View {
                 .overlay(alignment: .center) {
                     if workspaceStore.showCommandPalette {
                         CommandPaletteView(theme: theme)
+                    } else if workspaceStore.showQuickOpen {
+                        QuickOpenView(theme: theme)
                     }
                 }
                 .onDrop(of: [UTType.fileURL.identifier], isTargeted: $isDropTargeted) { providers in
