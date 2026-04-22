@@ -1,9 +1,22 @@
+# macOS
 .DS_Store
-/.build
-/Packages
-xcuserdata/
-DerivedData/
+
+# Swift Package Manager
+/.build/
+/Packages/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+
+# Xcode
+xcuserdata/
+DerivedData/
+
+# Local credentials
 .netrc
-/dist
+
+# Build and release output
+/dist/
+
+# Local design exports and screenshots
+/.design/
+/paperedit-current.png
