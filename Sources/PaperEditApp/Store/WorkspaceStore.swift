@@ -47,8 +47,6 @@ final class WorkspaceStore: ObservableObject {
         }
     }
 
-    var pinnedFiles: [FileTreeNode] { favoriteFiles }
-
     var recentProjects: [FileTreeNode] {
         recentFileURLs.map { url in
             FileTreeNode(

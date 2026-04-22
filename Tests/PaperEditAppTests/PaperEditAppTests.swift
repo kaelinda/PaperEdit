@@ -140,6 +140,35 @@ import Testing
 }
 
 @MainActor
+@Test func toggleFavoriteRemovesItAndUpdatesFavoriteState() throws {
+    let suiteName = "PaperEditTests-\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+        Issue.record("Expected isolated defaults suite")
+        return
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let configURL = tempDirectory.appendingPathComponent("favorite.md")
+    try "# favorite\n".write(to: configURL, atomically: true, encoding: .utf8)
+
+    let store = WorkspaceStore(defaults: defaults)
+    #expect(store.isFavorite(configURL) == false)
+
+    store.toggleFavorite(configURL)
+    #expect(store.isFavorite(configURL) == true)
+    #expect(store.favoriteFileURLs == [configURL])
+
+    store.toggleFavorite(configURL)
+    #expect(store.isFavorite(configURL) == false)
+    #expect(store.favoriteFileURLs.isEmpty)
+}
+
+@MainActor
 @Test func togglesPrimaryJSONFoldState() {
     let store = WorkspaceStore()
     store.apply(scene: .darkJSON)

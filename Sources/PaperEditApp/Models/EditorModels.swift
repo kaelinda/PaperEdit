@@ -171,8 +171,6 @@ enum SidebarSection: String, CaseIterable, Codable, Identifiable {
         case .explorer: "folder"
         }
     }
-
-    static var pinned: SidebarSection { .favorites }
 }
 
 enum PreferencePane: String, CaseIterable, Codable, Identifiable {
@@ -576,9 +574,9 @@ enum EditorSampleFactory {
         )
     }
 
-    static let pinnedFiles: [FileTreeNode] = [
+    static let favoriteFiles: [FileTreeNode] = [
         FileTreeNode(
-            name: "Core Configs",
+            name: "Favorite Configs",
             kind: .group,
             children: [
                 FileTreeNode(name: "settings.json", kind: .file, format: .json),
