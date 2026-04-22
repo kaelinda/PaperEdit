@@ -45,7 +45,7 @@ struct CommandPaletteView: View {
                     }
                     .padding(.horizontal, 14)
                     .frame(height: 42)
-                    .background(theme.elevatedBackground.opacity(0.88))
+                    .background(theme.secondaryElevatedBackground.opacity(0.92))
                     .overlay(alignment: .bottom) {
                         Rectangle()
                             .fill(theme.border)
@@ -93,7 +93,7 @@ struct CommandPaletteView: View {
                 .background {
                     ZStack {
                         VisualEffectBlur(material: .hudWindow)
-                        theme.elevatedBackground.opacity(0.72)
+                        theme.chromeBackground.opacity(0.82)
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -103,10 +103,10 @@ struct CommandPaletteView: View {
                 )
                 .overlay(alignment: .top) {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(.white.opacity(0.12), lineWidth: 1)
+                        .stroke(.white.opacity(0.10), lineWidth: 1)
                         .blendMode(.screen)
                 }
-                .shadow(color: .black.opacity(0.16), radius: 24, y: 14)
+                .shadow(color: theme.shadow.opacity(0.36), radius: 28, y: 16)
                 .padding(.top, proxy.size.height * 0.18)
             }
         }
@@ -177,7 +177,11 @@ private struct CommandPaletteRow: View {
             .frame(height: 40)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(isSelected ? theme.accent.opacity(0.82) : hovering ? theme.hover : .clear)
+                    .fill(isSelected ? theme.selectedItemFill : hovering ? theme.hover : .clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isSelected ? theme.selectedItemStroke : .clear, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

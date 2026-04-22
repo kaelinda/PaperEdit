@@ -46,6 +46,8 @@ import Testing
     #expect(store.activeTab?.name == "sample.yaml")
     #expect(store.activeTab?.format == .yaml)
     #expect(store.activeTab?.text.contains("paperedit") == true)
+    #expect(store.viewMode == .split)
+    #expect(store.previewModeAvailable == true)
 }
 
 @MainActor
@@ -96,4 +98,108 @@ import Testing
 
     #expect(store.activeTab?.text != initialText)
     #expect(store.activeTab?.foldMarkers.first?.isFolded != initialFoldState)
+}
+
+@Test func buildsStructuredPreviewForJSON() {
+    let document = StructuredPreviewBuilder.build(
+        format: .json,
+        text: #"{"name":"paperedit","features":["preview"],"enabled":true}"#
+    )
+    let titles = flattenTitles(document.nodes)
+
+    #expect(document.diagnostics.isEmpty)
+    #expect(titles.contains("JSON Root"))
+    #expect(titles.contains("name"))
+    #expect(titles.contains("features"))
+}
+
+@Test func buildsStructuredPreviewForYAML() {
+    let document = StructuredPreviewBuilder.build(
+        format: .yaml,
+        text: """
+        workspace:
+          name: paperedit
+          formats:
+            - toml
+        """
+    )
+    let titles = flattenTitles(document.nodes)
+
+    #expect(document.diagnostics.isEmpty)
+    #expect(titles.contains("YAML Document"))
+    #expect(titles.contains("workspace"))
+    #expect(titles.contains("name"))
+}
+
+@Test func buildsStructuredPreviewForTOML() {
+    let document = StructuredPreviewBuilder.build(
+        format: .toml,
+        text: """
+        [workspace]
+        name = "paperedit"
+        preview = true
+        """
+    )
+    let titles = flattenTitles(document.nodes)
+
+    #expect(document.diagnostics.isEmpty)
+    #expect(titles.contains("TOML Document"))
+    #expect(titles.contains("workspace"))
+    #expect(titles.contains("preview"))
+}
+
+@Test func buildsStructuredPreviewForXML() {
+    let document = StructuredPreviewBuilder.build(
+        format: .xml,
+        text: #"<root><item id="1">value</item></root>"#
+    )
+    let titles = flattenTitles(document.nodes)
+
+    #expect(document.diagnostics.isEmpty)
+    #expect(titles.contains("root"))
+    #expect(titles.contains("item"))
+    #expect(titles.contains("id"))
+}
+
+@Test func buildsStructuredPreviewForPlist() {
+    let document = StructuredPreviewBuilder.build(
+        format: .plist,
+        text: """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>name</key>
+            <string>paperedit</string>
+            <key>formats</key>
+            <array>
+                <string>toml</string>
+                <string>plist</string>
+            </array>
+        </dict>
+        </plist>
+        """
+    )
+    let titles = flattenTitles(document.nodes)
+
+    #expect(document.diagnostics.isEmpty)
+    #expect(titles.contains("Property List Root"))
+    #expect(titles.contains("name"))
+    #expect(titles.contains("formats"))
+}
+
+@Test func detectsShellScriptFormats() {
+    let scriptURL = URL(fileURLWithPath: "/tmp/deploy.sh")
+    let dotfileURL = URL(fileURLWithPath: "/tmp/.zshrc")
+    let shebangURL = URL(fileURLWithPath: "/tmp/bootstrap")
+
+    #expect(EditorFileFormat(fileURL: scriptURL) == .shellScript)
+    #expect(EditorFileFormat(fileURL: dotfileURL) == .shellScript)
+    #expect(EditorFileFormat(fileURL: shebangURL, contents: "#!/bin/bash\necho ready\n") == .shellScript)
+}
+
+private func flattenTitles(_ nodes: [StructuredPreviewNode]) -> [String] {
+    nodes.flatMap { node in
+        [node.title] + flattenTitles(node.children)
+    }
 }

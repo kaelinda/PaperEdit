@@ -120,17 +120,35 @@ struct MarkdownPreviewContainer: View {
 
     private var markdownPreview: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text(renderedMarkdown)
-                    .font(.system(size: 15))
-                    .foregroundStyle(theme.textPrimary)
-                    .lineSpacing(5)
-                    .textSelection(.enabled)
+            VStack(spacing: 24) {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text(tab.name)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(theme.textSubtle)
+
+                    Text(renderedMarkdown)
+                        .font(.system(size: 15))
+                        .foregroundStyle(theme.textPrimary)
+                        .lineSpacing(5)
+                        .textSelection(.enabled)
+                }
+                .padding(.horizontal, 52)
+                .padding(.vertical, 44)
+                .frame(maxWidth: 760, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .fill(theme.editorBackground)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(theme.border, lineWidth: 1)
+                )
+                .shadow(color: theme.shadow.opacity(isDark ? 0.28 : 0.14), radius: 28, y: 18)
             }
-            .padding(40)
-            .frame(maxWidth: 650, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.horizontal, isCompactWidth ? 20 : 40)
+            .padding(.vertical, isCompactWidth ? 20 : 32)
+            .frame(maxWidth: .infinity)
         }
-        .background(theme.windowBackground)
+        .background(theme.canvasBackground)
     }
 }

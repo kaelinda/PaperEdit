@@ -36,8 +36,13 @@ struct WorkspaceStatusBar: View {
         .font(.system(size: 11, weight: .medium))
         .foregroundStyle(theme.textMuted)
         .padding(.horizontal, 16)
-        .frame(height: 24)
-        .background(theme.windowBackground)
+        .frame(height: 28)
+        .background {
+            ZStack {
+                VisualEffectBlur(material: .headerView)
+                theme.chromeBackground.opacity(0.92)
+            }
+        }
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(theme.border)

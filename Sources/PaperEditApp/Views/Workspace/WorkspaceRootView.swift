@@ -29,6 +29,20 @@ struct WorkspaceRootView: View {
             let titlebarTopInset = geometry.safeAreaInsets.top
 
             ZStack {
+                theme.windowBackground
+                    .ignoresSafeArea()
+
+                LinearGradient(
+                    colors: [
+                        theme.chromeBackground.opacity(isDarkTheme ? 0.26 : 0.58),
+                        theme.windowBackground.opacity(0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(maxHeight: .infinity, alignment: .top)
+                .ignoresSafeArea()
+
                 VStack(spacing: 0) {
                     WorkspaceTitleBar(theme: theme, isCompactWidth: isCompactWidth, topInset: titlebarTopInset)
 
@@ -45,7 +59,6 @@ struct WorkspaceRootView: View {
 
                     WorkspaceStatusBar(theme: theme, status: workspaceStore.status)
                 }
-                .background(theme.windowBackground)
                 .overlay(WindowConfigurator().allowsHitTesting(false))
                 .overlay(alignment: .center) {
                     if workspaceStore.showCommandPalette {
@@ -85,6 +98,17 @@ struct WorkspaceRootView: View {
                         onTextChange: workspaceStore.updateText(_:selection:),
                         onSelectionChange: workspaceStore.updateSelection(_:)
                     )
+                } else if tab.format.supportsStructuredPreview {
+                    StructuredPreviewContainer(
+                        tab: tab,
+                        theme: theme,
+                        isDark: isDarkTheme,
+                        viewMode: workspaceStore.viewMode,
+                        isCompactWidth: isCompactWidth,
+                        onTextChange: workspaceStore.updateText(_:selection:),
+                        onSelectionChange: workspaceStore.updateSelection(_:),
+                        onToggleFold: tab.format == .json ? { _ in workspaceStore.togglePrimaryJSONFold() } : nil
+                    )
                 } else {
                     CodeEditorView(
                         text: tab.text,
@@ -106,7 +130,7 @@ struct WorkspaceRootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(theme.editorBackground)
+        .background(theme.canvasBackground)
         .clipped()
     }
 
@@ -125,22 +149,27 @@ private struct SidebarResizeHandle: View {
     @State private var dragStartWidth: CGFloat?
 
     var body: some View {
-        Rectangle()
-            .fill(.clear)
-            .frame(width: 6)
-            .contentShape(Rectangle())
-            .background(theme.border.opacity(0.9))
-            .gesture(
-                DragGesture(minimumDistance: 1)
-                    .onChanged { value in
-                        if dragStartWidth == nil {
-                            dragStartWidth = workspaceStore.sidebarWidth
-                        }
-                        workspaceStore.updateSidebarWidth((dragStartWidth ?? 240) + value.translation.width)
+        ZStack {
+            Rectangle()
+                .fill(.clear)
+                .frame(width: 8)
+                .contentShape(Rectangle())
+
+            RoundedRectangle(cornerRadius: 999, style: .continuous)
+                .fill(theme.borderStrong.opacity(0.72))
+                .frame(width: 2, height: 44)
+        }
+        .gesture(
+            DragGesture(minimumDistance: 1)
+                .onChanged { value in
+                    if dragStartWidth == nil {
+                        dragStartWidth = workspaceStore.sidebarWidth
                     }
-                    .onEnded { _ in
-                        dragStartWidth = nil
-                    }
-            )
+                    workspaceStore.updateSidebarWidth((dragStartWidth ?? 240) + value.translation.width)
+                }
+                .onEnded { _ in
+                    dragStartWidth = nil
+                }
+        )
     }
 }

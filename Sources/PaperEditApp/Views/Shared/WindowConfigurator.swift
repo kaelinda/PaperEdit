@@ -7,12 +7,12 @@ struct WindowConfigurator: NSViewRepresentable {
         DispatchQueue.main.async {
             guard let window = view.window else { return }
             window.titleVisibility = .hidden
-            window.titlebarAppearsTransparent = false
-            window.toolbarStyle = .automatic
-            window.styleMask.remove(.fullSizeContentView)
+            window.titlebarAppearsTransparent = true
+            window.toolbarStyle = .unifiedCompact
+            window.styleMask.insert(.fullSizeContentView)
             window.isMovableByWindowBackground = true
             window.backgroundColor = .windowBackgroundColor
-            window.isOpaque = true
+            window.isOpaque = false
         }
         return view
     }

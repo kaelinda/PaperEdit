@@ -9,6 +9,7 @@ enum EditorFileFormat: String, CaseIterable, Codable {
     case toml
     case xml
     case plist
+    case shellScript
     case plainText
 
     init(fileExtension: String) {
@@ -25,9 +26,46 @@ enum EditorFileFormat: String, CaseIterable, Codable {
             self = .xml
         case "plist":
             self = .plist
+        case "sh", "bash", "zsh", "ksh", "command":
+            self = .shellScript
         default:
             self = .plainText
         }
+    }
+
+    init(fileURL: URL, contents: String? = nil) {
+        self = Self.detect(fileURL: fileURL, contents: contents)
+    }
+
+    static func detect(fileURL: URL, contents: String? = nil) -> EditorFileFormat {
+        let fileName = fileURL.lastPathComponent.lowercased()
+        let shellDotfiles: Set<String> = [
+            ".bash_aliases",
+            ".bash_profile",
+            ".bashrc",
+            ".profile",
+            ".zprofile",
+            ".zshenv",
+            ".zshrc",
+        ]
+
+        if shellDotfiles.contains(fileName) {
+            return .shellScript
+        }
+
+        let byExtension = EditorFileFormat(fileExtension: fileURL.pathExtension)
+        if byExtension != .plainText {
+            return byExtension
+        }
+
+        if let contents {
+            let firstLine = contents.split(whereSeparator: \.isNewline).first?.lowercased() ?? ""
+            if firstLine.hasPrefix("#!"), firstLine.contains("sh") || firstLine.contains("bash") || firstLine.contains("zsh") || firstLine.contains("ksh") {
+                return .shellScript
+            }
+        }
+
+        return .plainText
     }
 
     var displayName: String {
@@ -38,6 +76,7 @@ enum EditorFileFormat: String, CaseIterable, Codable {
         case .toml: "TOML"
         case .xml: "XML"
         case .plist: "Property List"
+        case .shellScript: "Shell Script"
         case .plainText: "Plain Text"
         }
     }
@@ -50,6 +89,7 @@ enum EditorFileFormat: String, CaseIterable, Codable {
         case .toml: "slider.horizontal.3"
         case .xml: "chevron.left.forwardslash.chevron.right"
         case .plist: "list.bullet.rectangle"
+        case .shellScript: "terminal"
         case .plainText: "doc.plaintext"
         }
     }
@@ -62,6 +102,7 @@ enum EditorFileFormat: String, CaseIterable, Codable {
         case .toml: "#32D74B"
         case .xml: "#FF9500"
         case .plist: "#FF375F"
+        case .shellScript: "#64D2FF"
         case .plainText: "#8E8E93"
         }
     }
@@ -80,6 +121,8 @@ enum EditorFileFormat: String, CaseIterable, Codable {
             "xml"
         case .plist:
             "plist"
+        case .shellScript:
+            "sh"
         case .plainText:
             "txt"
         }
@@ -88,6 +131,15 @@ enum EditorFileFormat: String, CaseIterable, Codable {
     var contentType: UTType? {
         guard let preferredFilenameExtension else { return nil }
         return UTType(filenameExtension: preferredFilenameExtension)
+    }
+
+    var supportsStructuredPreview: Bool {
+        switch self {
+        case .markdown, .json, .yaml, .toml, .xml, .plist:
+            true
+        case .shellScript, .plainText:
+            false
+        }
     }
 }
 
@@ -309,7 +361,7 @@ enum CommandAction: Hashable {
     case saveFile
     case saveFileAs
     case activateScene(DemoScene)
-    case setMarkdownMode(EditorViewMode)
+    case setPreviewMode(EditorViewMode)
 }
 
 struct CommandItem: Identifiable, Hashable {

@@ -50,7 +50,7 @@ final class WorkspaceStore: ObservableObject {
                 id: url.path,
                 name: url.lastPathComponent,
                 kind: .file,
-                format: EditorFileFormat(fileExtension: url.pathExtension),
+                format: EditorFileFormat(fileURL: url),
                 sourceURL: url
             )
         }
@@ -66,8 +66,8 @@ final class WorkspaceStore: ObservableObject {
         return openTabs.first(where: { $0.id == activeTabID })
     }
 
-    var markdownModeAvailable: Bool {
-        activeTab?.format == .markdown
+    var previewModeAvailable: Bool {
+        activeTab?.format.supportsStructuredPreview == true
     }
 
     var hasUnsavedChanges: Bool {
@@ -163,7 +163,7 @@ final class WorkspaceStore: ObservableObject {
         untitledIndex += 1
         openTabs.append(tab)
         activeTabID = tab.id
-        viewMode = tab.format == .markdown ? .split : .edit
+        viewMode = tab.format.supportsStructuredPreview ? .split : .edit
         persistState()
         refreshStatus()
     }
@@ -175,8 +175,8 @@ final class WorkspaceStore: ObservableObject {
                 continue
             }
 
-            let format = EditorFileFormat(fileExtension: url.pathExtension)
             let text = (try? String(contentsOf: url)) ?? "// Unable to read \(url.lastPathComponent)"
+            let format = EditorFileFormat(fileURL: url, contents: text)
             let tab = EditorTab(
                 name: url.lastPathComponent,
                 format: format,
@@ -193,7 +193,7 @@ final class WorkspaceStore: ObservableObject {
             if workspaceRootURL == nil {
                 workspaceRootURL = url.deletingLastPathComponent()
             }
-            if format == .markdown {
+            if format.supportsStructuredPreview {
                 viewMode = .split
             }
         }
@@ -293,7 +293,7 @@ final class WorkspaceStore: ObservableObject {
         }
 
         persistState()
-        if tab.format == .markdown {
+        if tab.format.supportsStructuredPreview {
             viewMode = .split
         }
         refreshStatus()
@@ -405,7 +405,7 @@ final class WorkspaceStore: ObservableObject {
             saveActiveTabAs()
         case .activateScene(let scene):
             apply(scene: scene)
-        case .setMarkdownMode(let mode):
+        case .setPreviewMode(let mode):
             viewMode = mode
         }
         closeCommandPalette()
@@ -444,7 +444,7 @@ final class WorkspaceStore: ObservableObject {
             try openTabs[index].text.write(to: url, atomically: true, encoding: .utf8)
             openTabs[index].sourceURL = url
             openTabs[index].name = url.lastPathComponent
-            openTabs[index].format = EditorFileFormat(fileExtension: url.pathExtension)
+            openTabs[index].format = EditorFileFormat(fileURL: url, contents: openTabs[index].text)
             openTabs[index].isDirty = false
             noteRecentFile(url)
             if workspaceRootURL == nil {
@@ -574,7 +574,7 @@ final class WorkspaceStore: ObservableObject {
                 return FileTreeNode(
                     name: url.lastPathComponent,
                     kind: .file,
-                    format: EditorFileFormat(fileExtension: url.pathExtension),
+                    format: EditorFileFormat(fileURL: url),
                     sourceURL: url
                 )
             }
@@ -691,20 +691,20 @@ final class WorkspaceStore: ObservableObject {
                 action: .saveFileAs
             ),
             CommandItem(
-                category: "Markdown",
-                title: "Markdown: Split Preview",
-                subtitle: "Edit and preview side-by-side",
+                category: "Preview",
+                title: "Preview: Split View",
+                subtitle: "Edit beside Markdown or structured data preview",
                 symbolName: "rectangle.split.2x1",
-                keywords: ["markdown", "split"],
-                action: .setMarkdownMode(.split)
+                keywords: ["markdown", "json", "yaml", "toml", "xml", "plist", "split", "preview"],
+                action: .setPreviewMode(.split)
             ),
             CommandItem(
-                category: "Markdown",
-                title: "Markdown: WYSIWYG Shell",
-                subtitle: "Switch to composed preview shell",
+                category: "Preview",
+                title: "Preview: Rendered View",
+                subtitle: "Show only the rendered or structured preview",
                 symbolName: "eye",
-                keywords: ["markdown", "wysiwyg", "preview"],
-                action: .setMarkdownMode(.wysiwyg)
+                keywords: ["markdown", "json", "yaml", "toml", "xml", "plist", "structure", "preview"],
+                action: .setPreviewMode(.wysiwyg)
             ),
         ]
     }

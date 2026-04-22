@@ -6,31 +6,27 @@ struct WorkspaceSidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.textSubtle)
+            VStack(alignment: .leading, spacing: 10) {
+                Text(sidebarTitle)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(theme.textMuted)
+                    .tracking(0.4)
 
-                TextField("Search files", text: $workspaceStore.searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .foregroundStyle(theme.textPrimary)
+                searchField
 
-                Text("⌘F")
-                    .font(.system(size: 10, weight: .semibold))
+                if let workspaceRootURL = workspaceStore.workspaceRootURL {
+                    HStack(spacing: 6) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 11, weight: .medium))
+                        Text(workspaceRootURL.lastPathComponent)
+                            .lineLimit(1)
+                    }
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(theme.textSubtle)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(theme.elevatedBackground, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .stroke(theme.border, lineWidth: 1)
-                    )
+                }
             }
-            .padding(.horizontal, 12)
-            .frame(height: 30)
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
             .padding(.bottom, 12)
             .overlay(alignment: .bottom) {
                 Rectangle()
@@ -39,7 +35,7 @@ struct WorkspaceSidebar: View {
             }
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 14) {
                     SidebarSectionView(theme: theme, section: .pinned, nodes: filtered(nodes: workspaceStore.pinnedFiles))
                     SidebarSectionView(theme: theme, section: .recent, nodes: filtered(nodes: workspaceStore.recentProjects))
                     SidebarSectionView(
@@ -50,10 +46,35 @@ struct WorkspaceSidebar: View {
                         emptyAction: workspaceStore.presentOpenFolderPanel
                     )
                 }
-                .padding(.bottom, 16)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 16)
             }
         }
         .background(sidebarBackground)
+    }
+
+    private var sidebarTitle: String {
+        workspaceStore.workspaceRootURL == nil ? "Library" : "Workspace"
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(theme.textSubtle)
+
+            TextField("Search files", text: $workspaceStore.searchText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .foregroundStyle(theme.textPrimary)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 32)
+        .background(theme.secondaryElevatedBackground, in: Capsule(style: .continuous))
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(theme.border, lineWidth: 1)
+        )
     }
 
     @ViewBuilder
@@ -61,7 +82,7 @@ struct WorkspaceSidebar: View {
         if workspaceStore.sidebarMaterialStyle == .translucent {
             ZStack {
                 VisualEffectBlur(material: .sidebar)
-                theme.sidebarBackground.opacity(0.97)
+                theme.sidebarBackground.opacity(0.92)
             }
         } else {
             theme.sidebarBackground
@@ -109,42 +130,25 @@ private struct SidebarSectionView: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: workspaceStore.sidebarSections.contains(section) ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10, weight: .bold))
-                    Image(systemName: section.iconName)
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 9, weight: .bold))
                     Text(section.title.uppercased())
-                        .font(.system(size: 11, weight: .semibold))
-                        .tracking(0.9)
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(0.6)
                     Spacer()
+                    if !nodes.isEmpty {
+                        Text("\(flatCount(nodes))")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(theme.textSubtle)
+                    }
                 }
                 .foregroundStyle(theme.textMuted)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 8)
             }
             .buttonStyle(.plain)
 
             if workspaceStore.sidebarSections.contains(section) {
                 if nodes.isEmpty {
-                    if let emptyActionTitle, let emptyAction {
-                        Button(action: emptyAction) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "folder.badge.plus")
-                                    .font(.system(size: 12, weight: .medium))
-                                Text(emptyActionTitle)
-                                    .font(.system(size: 12, weight: .medium))
-                                Spacer()
-                            }
-                            .foregroundStyle(theme.textMuted)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 6)
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        Text(emptyStateCopy)
-                            .font(.system(size: 12))
-                            .foregroundStyle(theme.textMuted)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 6)
-                    }
+                    sectionEmptyState
                 } else {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(nodes) { node in
@@ -153,6 +157,37 @@ private struct SidebarSectionView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func flatCount(_ nodes: [FileTreeNode]) -> Int {
+        nodes.reduce(0) { partial, node in
+            partial + 1 + flatCount(node.children)
+        }
+    }
+
+    @ViewBuilder
+    private var sectionEmptyState: some View {
+        if let emptyActionTitle, let emptyAction {
+            Button(action: emptyAction) {
+                HStack(spacing: 8) {
+                    Image(systemName: "folder.badge.plus")
+                        .font(.system(size: 11, weight: .medium))
+                    Text(emptyActionTitle)
+                        .font(.system(size: 12, weight: .medium))
+                    Spacer()
+                }
+                .foregroundStyle(theme.textMuted)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+            }
+            .buttonStyle(.plain)
+        } else {
+            Text(emptyStateCopy)
+                .font(.system(size: 12))
+                .foregroundStyle(theme.textMuted)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
         }
     }
 
@@ -197,7 +232,7 @@ private struct FileTreeNodeRow: View {
                 HStack(spacing: 8) {
                     if isContainer {
                         Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(theme.textMuted)
                             .frame(width: 10)
                     } else {
@@ -206,23 +241,27 @@ private struct FileTreeNodeRow: View {
                     }
 
                     Image(systemName: iconName)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(iconColor)
                         .frame(width: 14)
 
                     Text(node.name)
                         .lineLimit(1)
-                        .font(.system(size: 13, weight: node.kind == .group ? .medium : .regular))
+                        .font(.system(size: 12, weight: node.kind == .group || node.kind == .project ? .medium : .regular))
                         .foregroundStyle(theme.textPrimary.opacity(node.kind == .project ? 0.9 : 1))
 
                     Spacer(minLength: 0)
                 }
-                .padding(.leading, CGFloat(depth) * 14 + 12)
+                .padding(.leading, CGFloat(depth) * 12 + 10)
                 .padding(.trailing, 10)
                 .padding(.vertical, 6)
                 .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(isSelected ? theme.hover : .clear)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(isSelected ? theme.selectedItemFill : .clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(isSelected ? theme.selectedItemStroke : .clear, lineWidth: 1)
                 )
             }
             .buttonStyle(.plain)
@@ -259,11 +298,13 @@ private struct FileTreeNodeRow: View {
     private var iconColor: Color {
         switch node.kind {
         case .file:
-            Color(hex: node.format?.accentHex ?? "#8E8E93")
+            Color(hex: node.format?.accentHex ?? "#8E8E93").opacity(0.82)
         case .folder:
-            theme.accent
-        case .group, .project:
-            theme.textMuted
+            Color(hex: "#4F8FF7").opacity(0.9)
+        case .group:
+            theme.textSubtle
+        case .project:
+            theme.textPrimary
         }
     }
 }

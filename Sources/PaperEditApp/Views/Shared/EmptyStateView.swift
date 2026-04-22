@@ -8,196 +8,208 @@ struct EmptyStateView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let isCompact = proxy.size.width < 720
+            let isCompact = proxy.size.width < 880
 
-            Group {
-                if isCompact {
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            mainEmptyContent(isCompact: true)
-                                .padding(.vertical, 40)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: isCompact ? 18 : 24) {
+                    heroPanel(isCompact: isCompact)
 
-                            emptySidebar
-                                .frame(maxWidth: .infinity)
-                                .padding(.bottom, 24)
-                        }
-                    }
-                } else {
-                    HStack(spacing: 0) {
-                        emptySidebar
-                            .frame(width: 240)
-
-                        VStack {
-                            Spacer()
-                            mainEmptyContent(isCompact: false)
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(theme.editorBackground)
+                    if !workspaceStore.recentFileURLs.isEmpty || workspaceStore.workspaceRootURL != nil {
+                        secondaryPanel(isCompact: isCompact)
                     }
                 }
+                .padding(.horizontal, isCompact ? 20 : 32)
+                .padding(.vertical, isCompact ? 20 : 30)
+                .frame(maxWidth: .infinity, minHeight: proxy.size.height)
             }
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isDropTargeted ? theme.selection : .clear)
-                    .padding(24)
-            )
+            .background(theme.canvasBackground)
+            .overlay {
+                RoundedRectangle(cornerRadius: 32, style: .continuous)
+                    .stroke(isDropTargeted ? theme.selectedItemStroke : .clear, lineWidth: 2)
+                    .padding(18)
+            }
         }
     }
 
-    private func mainEmptyContent(isCompact: Bool) -> some View {
-        VStack(spacing: isCompact ? 18 : 22) {
-            Image(systemName: "document")
-                .font(.system(size: isCompact ? 52 : 72, weight: .ultraLight))
-                .foregroundStyle(theme.textSubtle.opacity(0.9))
+    private func heroPanel(isCompact: Bool) -> some View {
+        VStack {
+            Spacer(minLength: isCompact ? 8 : 20)
 
-            VStack(spacing: 8) {
-                Text("Open a file or drop one here")
-                    .font(.system(size: isCompact ? 20 : 22, weight: .semibold))
-                    .foregroundStyle(theme.textPrimary)
+            VStack(alignment: .leading, spacing: 22) {
+                HStack(alignment: .top, spacing: 16) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .fill(theme.selectedItemFill)
+                        Image(systemName: "doc.text.image")
+                            .font(.system(size: isCompact ? 26 : 32, weight: .medium))
+                            .foregroundStyle(theme.accent)
+                    }
+                    .frame(width: isCompact ? 64 : 76, height: isCompact ? 64 : 76)
 
-                Text("Drag and drop a file anywhere in this window to open it.")
-                    .font(.system(size: 14))
-                    .foregroundStyle(theme.textMuted)
-                    .multilineTextAlignment(.center)
-            }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("A quieter place to start.")
+                            .font(.system(size: isCompact ? 26 : 32, weight: .semibold))
+                            .foregroundStyle(theme.textPrimary)
 
-            shortcutGrid(isCompact: isCompact)
+                        Text("Open a document, attach a folder, or drop files into the editor. The left sidebar already keeps your recent context nearby.")
+                            .font(.system(size: 14))
+                            .foregroundStyle(theme.textMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
 
-            Label("Markdown, JSON, YAML, TOML, XML", systemImage: "doc.text")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(theme.textMuted)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(theme.elevatedBackground)
-                )
+                HStack(spacing: 10) {
+                    quickActionButton("Open File...", symbol: "doc.badge.plus", prominent: true) {
+                        workspaceStore.presentOpenPanel()
+                    }
+                    quickActionButton("Open Folder...", symbol: "folder.badge.plus", prominent: false) {
+                        workspaceStore.presentOpenFolderPanel()
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    hintRow(symbol: "command", text: "Open File", shortcut: "O")
+                    hintRow(symbol: "command", text: "New File", shortcut: "N")
+                    hintRow(symbol: "command", text: "Command Palette", shortcut: "⇧P")
+                }
+                .padding(16)
+                .background(theme.secondaryElevatedBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay(
-                    Capsule(style: .continuous)
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(theme.border, lineWidth: 1)
                 )
+
+                HStack(spacing: 8) {
+                    Image(systemName: "tray.and.arrow.down")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Markdown, JSON, YAML, TOML and XML render cleanly here.")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundStyle(theme.textSubtle)
+            }
+            .padding(.horizontal, isCompact ? 24 : 42)
+            .padding(.vertical, isCompact ? 26 : 36)
+            .frame(maxWidth: 760, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    .fill(theme.editorBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    .stroke(theme.border, lineWidth: 1)
+            )
+            .shadow(color: theme.shadow.opacity(0.12), radius: 24, y: 16)
+
+            Spacer(minLength: isCompact ? 12 : 20)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func secondaryPanel(isCompact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Quick Access")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(theme.textMuted)
+                    .tracking(0.6)
+                Spacer()
+            }
+
+            if isCompact {
+                VStack(spacing: 12) {
+                    workspaceCard
+                    recentFilesCard
+                }
+            } else {
+                HStack(alignment: .top, spacing: 14) {
+                    workspaceCard
+                    recentFilesCard
+                }
+            }
+        }
+        .padding(.horizontal, isCompact ? 0 : 10)
+        .frame(maxWidth: 760)
+    }
+
+    private var workspaceCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(theme.selectedItemFill)
+                    Image(systemName: "folder")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(theme.accent)
+                }
+                .frame(width: 30, height: 30)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Workspace")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(theme.textPrimary)
+                    Text(workspaceStore.workspaceRootURL?.lastPathComponent ?? "No folder attached")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(theme.textSubtle)
+                        .lineLimit(1)
+                }
+            }
+
+            Text(workspaceStore.workspaceRootURL?.path ?? "Attach a directory if you want persistent file browsing in the left sidebar.")
+                .font(.system(size: 12))
+                .foregroundStyle(theme.textMuted)
                 .fixedSize(horizontal: false, vertical: true)
+
+            quickActionButton("Choose Folder", symbol: "folder.badge.plus", prominent: false) {
+                workspaceStore.presentOpenFolderPanel()
+            }
         }
-        .frame(maxWidth: isCompact ? 520 : 640)
-        .padding(.horizontal, isCompact ? 18 : 24)
-    }
-
-    private var emptySidebar: some View {
-        VStack(spacing: 0) {
-            searchBar
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
-                .padding(.bottom, 10)
-
-            sidebarBlock(
-                title: "Recent",
-                body: AnyView(
-                    VStack(spacing: 8) {
-                        if filteredRecentFiles.isEmpty {
-                            VStack(spacing: 12) {
-                                Image(systemName: "clock")
-                                    .font(.system(size: 22, weight: .light))
-                                    .foregroundStyle(theme.textSubtle)
-                                Text(recentEmptyCopy)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(theme.textMuted)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .padding(.vertical, 18)
-                        } else {
-                            VStack(alignment: .leading, spacing: 2) {
-                                ForEach(filteredRecentFiles.prefix(5), id: \.self) { url in
-                                    recentFileButton(url)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-
-                        Button("Open File...") {
-                            workspaceStore.presentOpenPanel()
-                        }
-                        .buttonStyle(.bordered)
-                        .padding(.top, filteredRecentFiles.isEmpty ? 0 : 6)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 12)
-                )
-            )
-
-            sidebarBlock(
-                title: "Workspace",
-                body: AnyView(
-                    VStack(spacing: 12) {
-                        Image(systemName: "folder")
-                            .font(.system(size: 22, weight: .light))
-                            .foregroundStyle(theme.textSubtle)
-                        Text(workspaceStore.workspaceRootURL == nil ? "No workspace folder" : workspaceStore.workspaceRootURL?.lastPathComponent ?? "")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(theme.textMuted)
-                        Button("Open Folder...") {
-                            workspaceStore.presentOpenFolderPanel()
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    .padding(.vertical, 18)
-                )
-            )
-
-            Spacer()
-        }
-        .background(theme.sidebarBackground)
-    }
-
-    private var searchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(theme.textSubtle)
-
-            TextField("Search recent files", text: $workspaceStore.searchText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
-                .foregroundStyle(theme.textPrimary)
-
-            Spacer()
-
-            Text("⌘F")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(theme.textSubtle)
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 30)
-        .background(theme.elevatedBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.secondaryElevatedBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(theme.border, lineWidth: 1)
         )
     }
 
-    private var filteredRecentFiles: [URL] {
-        let query = workspaceStore.searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else { return workspaceStore.recentFileURLs }
-        return workspaceStore.recentFileURLs.filter { url in
-            url.lastPathComponent.lowercased().contains(query)
-                || url.deletingLastPathComponent().path.lowercased().contains(query)
-        }
-    }
+    private var recentFilesCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Recent Files")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(theme.textPrimary)
 
-    private var recentEmptyCopy: String {
-        workspaceStore.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? "No recent files yet"
-            : "No matching recent files"
+            if workspaceStore.recentFileURLs.isEmpty {
+                Text("Files you open will appear here for quick access.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(theme.textMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(workspaceStore.recentFileURLs.prefix(3)), id: \.self) { url in
+                        recentFileButton(url)
+                    }
+                }
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.secondaryElevatedBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(theme.border, lineWidth: 1)
+        )
     }
 
     private func recentFileButton(_ url: URL) -> some View {
-        Button {
+        let format = EditorFileFormat(fileURL: url)
+
+        return Button {
             workspaceStore.openExternalFiles([url])
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: EditorFileFormat(fileExtension: url.pathExtension).iconName)
+            HStack(spacing: 10) {
+                Image(systemName: format.iconName)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color(hex: EditorFileFormat(fileExtension: url.pathExtension).accentHex))
+                    .foregroundStyle(Color(hex: format.accentHex))
                     .frame(width: 16)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -214,84 +226,57 @@ struct EmptyStateView: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
             .frame(minHeight: 44)
-            .background(theme.elevatedBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(theme.editorBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(theme.border.opacity(0.75), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
     }
 
-    @ViewBuilder
-    private func shortcutGrid(isCompact: Bool) -> some View {
-        VStack(spacing: 0) {
-            if isCompact {
-                shortcutCell("⌘ O", title: "Open File")
-                Divider().overlay(theme.border)
-                shortcutCell("⌘ N", title: "New File")
-                Divider().overlay(theme.border)
-                shortcutCell("⌘ ⇧ P", title: "Command Palette")
-                Divider().overlay(theme.border)
-                shortcutCell("⌘ ,", title: "Preferences")
-            } else {
-                HStack(spacing: 0) {
-                    shortcutCell("⌘ O", title: "Open File")
-                    shortcutCell("⌘ ⇧ P", title: "Command Palette")
-                }
-                Divider().overlay(theme.border)
-                HStack(spacing: 0) {
-                    shortcutCell("⌘ N", title: "New File")
-                    shortcutCell("⌘ ,", title: "Preferences")
-                }
+    private func quickActionButton(_ title: String, symbol: String, prominent: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
             }
+            .foregroundStyle(prominent ? theme.accentForeground : theme.textPrimary)
+            .padding(.horizontal, 14)
+            .frame(height: 36)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(prominent ? theme.accent : theme.editorBackground)
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(prominent ? .clear : theme.border, lineWidth: 1)
+            )
         }
-        .background(theme.elevatedBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(theme.border, lineWidth: 1)
-        )
+        .buttonStyle(.plain)
     }
 
-    private func shortcutCell(_ shortcut: String, title: String) -> some View {
-        HStack(spacing: 16) {
-            Text(shortcut)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(theme.textPrimary)
-                .frame(width: 64, alignment: .leading)
+    private func hintRow(symbol: String, text: String, shortcut: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(theme.textSubtle)
+                .frame(width: 12)
 
-            Text(title)
-                .font(.system(size: 13, weight: .medium))
+            Text(text)
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(theme.textMuted)
 
             Spacer()
-        }
-        .padding(.horizontal, 18)
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 44, alignment: .leading)
-    }
 
-    private func sidebarBlock(title: String, body: AnyView) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(title.uppercased())
-                    .font(.system(size: 11, weight: .semibold))
-                    .tracking(0.8)
-                    .foregroundStyle(theme.textMuted)
-                Spacer()
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-
-            body
-                .frame(maxWidth: .infinity)
-        }
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(theme.border)
-                .frame(height: 1)
+            Text(shortcut)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(theme.textPrimary)
         }
     }
 }
