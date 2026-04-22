@@ -1,7 +1,7 @@
 # PaperEdit
 
 <p align="center">
-  <img src="Assets/AppIcon.png" alt="PaperEdit icon" width="96" height="96">
+  <img src="Assets/AppIcon.svg" alt="PaperEdit icon" width="96" height="96">
 </p>
 
 PaperEdit 是一个使用 SwiftUI 构建的 macOS 文本编辑器原型，面向 Markdown、JSON、YAML、TOML、XML、Property List 和纯文本文件的轻量编辑场景。项目使用 Swift Package Manager 管理，可直接通过 `swift run` 启动，也提供脚本生成 `.app` 和 zip 发布包。
