@@ -57,9 +57,10 @@ final class WorkspaceStore: ObservableObject {
     }
 
     var recentProjects: [FileTreeNode] {
-        recentFileURLs.map { url in
-            FileTreeNode(
-                id: url.path,
+        recentFileURLs.compactMap { url in
+            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            return FileTreeNode(
+                id: "recent:\(url.path)",
                 name: url.lastPathComponent,
                 kind: .file,
                 format: EditorFileFormat(fileURL: url),
@@ -259,7 +260,7 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func toggleFavorite(_ url: URL) {
-        if let existingIndex = favoriteFileURLs.firstIndex(of: url) {
+        if let existingIndex = favoriteFileURLs.firstIndex(where: { isSameFileURL($0, url) }) {
             favoriteFileURLs.remove(at: existingIndex)
         } else {
             favoriteFileURLs.insert(url, at: 0)
@@ -268,7 +269,7 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func isFavorite(_ url: URL) -> Bool {
-        favoriteFileURLs.contains(url)
+        favoriteFileURLs.contains(where: { isSameFileURL($0, url) })
     }
 
     func toggleNodeExpansion(_ id: String) {

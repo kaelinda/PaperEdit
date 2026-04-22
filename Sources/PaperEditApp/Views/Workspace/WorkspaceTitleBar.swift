@@ -90,7 +90,7 @@ struct WorkspaceTitleBar: View {
                     workspaceStore.createUntitledTab()
                 }
                 ToolbarIconButton(symbol: "magnifyingglass", theme: theme) {
-                    workspaceStore.openCommandPalette(prefill: "")
+                    workspaceStore.openQuickOpen()
                 }
                 ToolbarIconButton(symbol: "square.and.arrow.up", theme: theme) {
                     _ = workspaceStore.saveActiveTab()

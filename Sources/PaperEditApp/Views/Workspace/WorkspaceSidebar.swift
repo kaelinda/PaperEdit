@@ -7,7 +7,7 @@ struct WorkspaceSidebar: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
-                Text(sidebarTitle)
+                Text("Files")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(theme.textMuted)
                     .tracking(0.4)
@@ -51,10 +51,6 @@ struct WorkspaceSidebar: View {
             }
         }
         .background(sidebarBackground)
-    }
-
-    private var sidebarTitle: String {
-        workspaceStore.workspaceRootURL == nil ? "Library" : "Workspace"
     }
 
     private var searchField: some View {
@@ -135,11 +131,6 @@ private struct SidebarSectionView: View {
                         .font(.system(size: 10, weight: .semibold))
                         .tracking(0.6)
                     Spacer()
-                    if !nodes.isEmpty {
-                        Text("\(flatCount(nodes))")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(theme.textSubtle)
-                    }
                 }
                 .foregroundStyle(theme.textMuted)
                 .padding(.horizontal, 8)
@@ -157,12 +148,6 @@ private struct SidebarSectionView: View {
                     }
                 }
             }
-        }
-    }
-
-    private func flatCount(_ nodes: [FileTreeNode]) -> Int {
-        nodes.reduce(0) { partial, node in
-            partial + 1 + flatCount(node.children)
         }
     }
 
@@ -194,7 +179,7 @@ private struct SidebarSectionView: View {
     private var emptyStateCopy: String {
         switch section {
         case .favorites:
-            "No favorites yet."
+            "Pin the files you revisit often."
         case .recent:
             "Files you open will appear here."
         case .explorer:
@@ -205,6 +190,7 @@ private struct SidebarSectionView: View {
 
 private struct FileTreeNodeRow: View {
     @EnvironmentObject private var workspaceStore: WorkspaceStore
+    @State private var hovering = false
     let node: FileTreeNode
     let depth: Int
     let theme: PaperTheme
@@ -219,7 +205,53 @@ private struct FileTreeNodeRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Button {
+            HStack(spacing: 8) {
+                if isContainer {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(theme.textMuted)
+                        .frame(width: 10)
+                } else {
+                    Spacer()
+                        .frame(width: 10)
+                }
+
+                Image(systemName: iconName)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(iconColor)
+                    .frame(width: 14)
+
+                Text(node.name)
+                    .lineLimit(1)
+                    .font(.system(size: 12, weight: node.kind == .group || node.kind == .project ? .medium : .regular))
+                    .foregroundStyle(theme.textPrimary.opacity(node.kind == .project ? 0.9 : 1))
+
+                Spacer(minLength: 0)
+
+                if let sourceURL = node.sourceURL, node.kind == .file, hovering || workspaceStore.isFavorite(sourceURL) {
+                    Button {
+                        workspaceStore.toggleFavorite(sourceURL)
+                    } label: {
+                        Image(systemName: workspaceStore.isFavorite(sourceURL) ? "star.fill" : "star")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(workspaceStore.isFavorite(sourceURL) ? theme.accent : theme.textSubtle)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .contentShape(Rectangle())
+            .padding(.leading, CGFloat(depth) * 12 + 10)
+            .padding(.trailing, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected ? theme.selectedItemFill : .clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isSelected ? theme.selectedItemStroke : .clear, lineWidth: 1)
+            )
+            .onTapGesture {
                 switch node.kind {
                 case .file:
                     workspaceStore.openFileTreeNode(node)
@@ -228,43 +260,8 @@ private struct FileTreeNodeRow: View {
                 case .project:
                     break
                 }
-            } label: {
-                HStack(spacing: 8) {
-                    if isContainer {
-                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(theme.textMuted)
-                            .frame(width: 10)
-                    } else {
-                        Spacer()
-                            .frame(width: 10)
-                    }
-
-                    Image(systemName: iconName)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(iconColor)
-                        .frame(width: 14)
-
-                    Text(node.name)
-                        .lineLimit(1)
-                        .font(.system(size: 12, weight: node.kind == .group || node.kind == .project ? .medium : .regular))
-                        .foregroundStyle(theme.textPrimary.opacity(node.kind == .project ? 0.9 : 1))
-
-                    Spacer(minLength: 0)
-                }
-                .padding(.leading, CGFloat(depth) * 12 + 10)
-                .padding(.trailing, 10)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(isSelected ? theme.selectedItemFill : .clear)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(isSelected ? theme.selectedItemStroke : .clear, lineWidth: 1)
-                )
             }
-            .buttonStyle(.plain)
+            .onHover { hovering = $0 }
 
             if isExpanded, !node.children.isEmpty {
                 ForEach(node.children) { child in
