@@ -131,6 +131,41 @@ import Testing
 }
 
 @MainActor
+@Test func quickOpenSkipsUnreadableFilesWithoutOpeningPlaceholderTabs() throws {
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let unreadableURL = tempDirectory.appendingPathComponent("locked.md")
+    try "# locked\n".write(to: unreadableURL, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes(
+        [.posixPermissions: NSNumber(value: Int16(0o000))],
+        ofItemAtPath: unreadableURL.path
+    )
+    defer {
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: NSNumber(value: Int16(0o600))],
+            ofItemAtPath: unreadableURL.path
+        )
+    }
+
+    let store = WorkspaceStore()
+    store.openQuickOpen(prefill: "locked")
+
+    let item = QuickOpenItem(
+        title: "locked.md",
+        subtitle: tempDirectory.path,
+        sourceURL: unreadableURL,
+        format: .markdown,
+        source: .workspace
+    )
+    store.openQuickOpenItem(item)
+
+    #expect(store.openTabs.isEmpty)
+    #expect(store.showQuickOpen == true)
+}
+
+@MainActor
 @Test func openingQuickOpenItemFocusesExistingTabInsteadOfDuplicatingIt() throws {
     let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)

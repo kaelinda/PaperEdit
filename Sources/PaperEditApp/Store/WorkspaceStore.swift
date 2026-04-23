@@ -448,7 +448,7 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func openQuickOpenItem(_ item: QuickOpenItem) {
-        guard FileManager.default.fileExists(atPath: item.sourceURL.path) else { return }
+        guard canOpenQuickOpenItem(item) else { return }
         openExternalFiles([item.sourceURL])
         closeQuickOpen()
     }
@@ -519,6 +519,18 @@ final class WorkspaceStore: ObservableObject {
             return tab.name
         }
         return "\(tab.name).\(preferredExtension)"
+    }
+
+    private func canOpenQuickOpenItem(_ item: QuickOpenItem) -> Bool {
+        if openTabs.contains(where: { isSameFileURL($0.sourceURL, item.sourceURL) }) {
+            return true
+        }
+
+        guard FileManager.default.isReadableFile(atPath: item.sourceURL.path) else {
+            return false
+        }
+
+        return (try? String(contentsOf: item.sourceURL)) != nil
     }
 
     @discardableResult
