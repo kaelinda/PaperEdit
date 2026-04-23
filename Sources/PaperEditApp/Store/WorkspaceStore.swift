@@ -16,6 +16,7 @@ final class WorkspaceStore: ObservableObject {
     @Published var viewMode: EditorViewMode = .split
     @Published var showCommandPalette = false
     @Published var showQuickOpen = false
+    @Published var quickOpenErrorMessage: String?
     @Published var showSettings = false
     @Published var activeScene: DemoScene = .lightMarkdownSplit
     @Published var status = EditorStatus.empty
@@ -403,6 +404,7 @@ final class WorkspaceStore: ObservableObject {
             sidebarWidth = minSidebarWidth
         }
         showQuickOpen = true
+        quickOpenErrorMessage = nil
         quickOpenModel.reset()
         quickOpenModel.query = prefill
         refreshWorkspaceFileIndex()
@@ -410,6 +412,7 @@ final class WorkspaceStore: ObservableObject {
 
     func closeQuickOpen() {
         showQuickOpen = false
+        quickOpenErrorMessage = nil
         quickOpenModel.reset()
     }
 
@@ -451,7 +454,11 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func openQuickOpenItem(_ item: QuickOpenItem) {
-        guard canOpenQuickOpenItem(item) else { return }
+        guard canOpenQuickOpenItem(item) else {
+            quickOpenErrorMessage = "Unable to open \(item.title). Check file permissions."
+            return
+        }
+        quickOpenErrorMessage = nil
         openExternalFiles([item.sourceURL])
         closeQuickOpen()
     }

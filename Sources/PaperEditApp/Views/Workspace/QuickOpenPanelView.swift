@@ -11,6 +11,7 @@ struct QuickOpenPanelView: View {
 
         VStack(spacing: 0) {
             queryRow(items: items)
+            errorMessage
 
             ScrollView {
                 if items.isEmpty {
@@ -49,6 +50,7 @@ struct QuickOpenPanelView: View {
         }
         .onChange(of: workspaceStore.quickOpenModel.query) {
             workspaceStore.quickOpenModel.selectedIndex = 0
+            workspaceStore.quickOpenErrorMessage = nil
         }
         .onMoveCommand { direction in
             switch direction {
@@ -102,6 +104,29 @@ struct QuickOpenPanelView: View {
                 .fill(theme.border)
                 .frame(height: 1)
         }
+    }
+
+    @ViewBuilder
+    private var errorMessage: some View {
+        if let message = workspaceStore.quickOpenErrorMessage {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 10, weight: .semibold))
+
+                Text(message)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(2)
+            }
+            .foregroundStyle(warningColor)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(warningColor.opacity(0.08))
+        }
+    }
+
+    private var warningColor: Color {
+        AccentSwatch.orange.interfaceColor
     }
 
     private var emptyState: some View {

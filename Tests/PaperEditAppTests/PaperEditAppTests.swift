@@ -169,7 +169,7 @@ import Testing
 }
 
 @MainActor
-@Test func quickOpenSkipsUnreadableFilesWithoutOpeningPlaceholderTabs() throws {
+@Test func quickOpenExplainsUnreadableWorkspaceFilesWithoutOpeningPlaceholderTabs() throws {
     let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: tempDirectory) }
@@ -188,19 +188,19 @@ import Testing
     }
 
     let store = WorkspaceStore()
+    store.workspaceRootURL = tempDirectory
     store.openQuickOpen(prefill: "locked")
 
-    let item = QuickOpenItem(
-        title: "locked.md",
-        subtitle: tempDirectory.path,
-        sourceURL: unreadableURL,
-        format: .markdown,
-        source: .workspace
-    )
+    let results = store.quickOpenItems()
+    let item = try #require(results.first { $0.sourceURL.resolvingSymlinksInPath().path == unreadableURL.resolvingSymlinksInPath().path })
+    #expect(item.title == "locked.md")
+    #expect(item.source == .workspace)
+
     store.openQuickOpenItem(item)
 
     #expect(store.openTabs.isEmpty)
     #expect(store.showQuickOpen == true)
+    #expect(store.quickOpenErrorMessage == "Unable to open locked.md. Check file permissions.")
 }
 
 @MainActor
