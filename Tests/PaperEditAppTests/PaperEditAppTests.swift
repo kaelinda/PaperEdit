@@ -100,6 +100,32 @@ import Testing
 }
 
 @MainActor
+@Test func quickOpenRefreshesWhenReopenedAfterWorkspaceAddsMatchingFile() throws {
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let initialConfig = tempDirectory.appendingPathComponent("project-a.json")
+    try "{}".write(to: initialConfig, atomically: true, encoding: .utf8)
+
+    let store = WorkspaceStore()
+    store.workspaceRootURL = tempDirectory
+    store.openQuickOpen(prefill: "project")
+
+    let initialResults = store.quickOpenItems()
+    #expect(initialResults.map { $0.sourceURL.lastPathComponent } == ["project-a.json"])
+
+    let newConfig = tempDirectory.appendingPathComponent("project-b.json")
+    try "{}".write(to: newConfig, atomically: true, encoding: .utf8)
+
+    store.closeQuickOpen()
+    store.openQuickOpen(prefill: "project")
+
+    let refreshedResults = store.quickOpenItems()
+    #expect(refreshedResults.map { $0.sourceURL.lastPathComponent }.sorted() == ["project-a.json", "project-b.json"])
+}
+
+@MainActor
 @Test func quickOpenOmitsDeletedRecentFilesAndRefusesToOpenThem() throws {
     let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)

@@ -403,6 +403,7 @@ final class WorkspaceStore: ObservableObject {
         showQuickOpen = true
         quickOpenModel.reset()
         quickOpenModel.query = prefill
+        refreshWorkspaceFileIndex()
     }
 
     func closeQuickOpen() {
