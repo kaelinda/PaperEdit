@@ -4,14 +4,16 @@
   <img src="Assets/AppIcon.svg" alt="PaperEdit icon" width="96" height="96">
 </p>
 
-PaperEdit 是一个使用 SwiftUI 构建的 macOS 文本编辑器原型，面向 Markdown、JSON、YAML、TOML、XML、Property List 和纯文本文件的轻量编辑场景。项目使用 Swift Package Manager 管理，可直接通过 `swift run` 启动，也提供脚本生成 `.app` 和 zip 发布包。
+PaperEdit 是一个使用 SwiftUI 构建的 macOS 轻量文本编辑器，面向 Markdown、JSON、YAML、TOML、XML、Property List 和纯文本文件的快速编辑场景。项目使用 Swift Package Manager 管理，可直接通过 `swift run` 启动，也提供脚本生成 `.app` 和 zip 发布包。
 
 ## 功能概览
 
 - 多标签文件编辑，支持新建、打开、保存和另存为。
 - Markdown 编辑、分屏预览和组合预览模式。
 - JSON、YAML、TOML、XML、plist 与纯文本格式识别。
-- 工作区侧边栏、最近文件、打开标签和文件树浏览。
+- 工作区侧边栏按 Favorites、Recent、Explorer 组织文件入口。
+- Quick Open 支持在当前工作区和最近文件中快速定位文件。
+- Favorites 手动收藏常用文件，并独立于最近文件持久化。
 - 命令面板、应用设置、主题切换和侧边栏折叠。
 - 拖拽文件打开、最近文件持久化和基础状态栏信息。
 
@@ -49,20 +51,20 @@ swift build
 swift test
 ```
 
-当前测试覆盖了演示场景切换、侧边栏宽度限制、外部文件打开、重复文件复用、保存脏文件以及 JSON 折叠状态切换等核心状态逻辑。
+当前测试覆盖了演示场景切换、侧边栏宽度限制、外部文件打开、重复文件复用、Favorites 持久化、Quick Open 结果排序与异常文件处理、保存脏文件以及 JSON 折叠状态切换等核心状态逻辑。
 
 ## 打包发布
 
 项目提供发布脚本，用于构建 release 可执行文件、生成 macOS `.app` 包、签名并压缩为 zip：
 
 ```bash
-./scripts/build_release_app.sh 0.1.0
+./scripts/build_release_app.sh 0.1.2
 ```
 
 生成结果位于 `dist/`：
 
 - `dist/PaperEdit.app`
-- `dist/PaperEdit-0.1.0-macOS.zip`
+- `dist/PaperEdit-0.1.2-macOS.zip`
 
 发布脚本依赖 `Assets/AppIcon.png` 生成 `.icns` 图标文件。
 
@@ -103,10 +105,21 @@ swift test
 | `Command + O` | 打开文件 |
 | `Command + S` | 保存 |
 | `Command + Shift + S` | 另存为 |
+| `Command + P` | Quick Open |
 | `Command + Shift + P` | 打开命令面板 |
 | `Command + Option + 0` | 切换侧边栏 |
 | `Command + Option + T` | 切换主题 |
 | `Command + ,` | 打开设置 |
+
+## 版本更新
+
+### v0.1.2
+
+- 重新梳理侧边栏文件入口，以 Favorites、Recent、Explorer 区分常用文件、最近文件和工作区浏览。
+- 新增文件专用的 Quick Open，可从侧边栏、标题栏放大镜或 `Command + P` 快速打开文件。
+- Favorites 支持手动收藏和持久化，重新打开应用后仍保留常用文件入口。
+- Quick Open 优先搜索当前工作区，再补充最近文件；重复打开同一文件时会聚焦已有标签页。
+- 改进删除、不可读文件等异常场景处理，避免静默失败或打开占位标签页。
 
 ## 开发说明
 
