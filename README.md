@@ -58,13 +58,13 @@ swift test
 项目提供发布脚本，用于构建 release 可执行文件、生成 macOS `.app` 包、签名并压缩为 zip：
 
 ```bash
-./scripts/build_release_app.sh 0.1.2
+./scripts/build_release_app.sh 0.1.3
 ```
 
 生成结果位于 `dist/`：
 
 - `dist/PaperEdit.app`
-- `dist/PaperEdit-0.1.2-macOS.zip`
+- `dist/PaperEdit-0.1.3-macOS.zip`
 
 发布脚本依赖 `Assets/AppIcon.png` 生成 `.icns` 图标文件。
 
@@ -112,6 +112,14 @@ swift test
 | `Command + ,` | 打开设置 |
 
 ## 版本更新
+
+### v0.1.3
+
+- 编辑器支持 `Command +` / `Command -` 调整字号，并持久化记住偏好设置。
+- JSON、YAML、TOML、XML、plist 与 shell 脚本编辑区补充语法高亮，结构化格式在编辑态也会直接显示校验结果。
+- 优化编辑器与预览面板视觉层级，改进当前行强调、卡片式面板、Markdown 分块预览和代码行号对齐。
+- 结构化预览树与左侧侧边栏补充更顺滑的展开/折叠反馈，预览节点支持整行点击展开收起。
+- 标题栏新增明暗模式切换按钮，侧边栏字体、行高和图标尺寸同步优化，提高可读性。
 
 ### v0.1.2
 
