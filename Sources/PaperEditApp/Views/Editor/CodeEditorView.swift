@@ -32,6 +32,34 @@ struct CodeEditorView: View {
     }
 }
 
+struct EditorPaneSurface<Content: View>: View {
+    let theme: PaperTheme
+    let isDark: Bool
+    @ViewBuilder let content: Content
+
+    init(
+        theme: PaperTheme,
+        isDark: Bool,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.theme = theme
+        self.isDark = isDark
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(theme.editorBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(theme.border, lineWidth: 1)
+            )
+            .shadow(color: theme.shadow.opacity(isDark ? 0.22 : 0.1), radius: 22, y: 12)
+    }
+}
+
 private struct NativeCodeTextView: NSViewRepresentable {
     var text: String
     var language: EditorFileFormat
@@ -96,6 +124,7 @@ private final class EditorTextContainerView: NSView {
     private let editorScrollView = NSScrollView()
     private let stackView = NSStackView()
     private let gutterWidthConstraint: NSLayoutConstraint
+    private let gutterWidth: CGFloat = 60
 
     private var currentTheme: PaperTheme?
     private var currentLanguage: EditorFileFormat = .plainText
@@ -105,7 +134,7 @@ private final class EditorTextContainerView: NSView {
     init(showLineNumbers: Bool) {
         textView = Self.makeEditorTextView()
         gutterTextView = Self.makeGutterTextView()
-        gutterWidthConstraint = gutterScrollView.widthAnchor.constraint(equalToConstant: showLineNumbers ? 48 : 0)
+        gutterWidthConstraint = gutterScrollView.widthAnchor.constraint(equalToConstant: showLineNumbers ? gutterWidth : 0)
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         wantsLayer = true
@@ -136,20 +165,27 @@ private final class EditorTextContainerView: NSView {
         isDark: Bool
     ) {
         let editorBackground = NSColor(theme.editorBackground)
-        let gutterBackground = NSColor(theme.editorBackground)
+        let gutterBackground = NSColor(theme.secondaryElevatedBackground.opacity(isDark ? 0.72 : 0.92))
         layer?.backgroundColor = editorBackground.cgColor
         editorScrollView.backgroundColor = editorBackground
         textView.backgroundColor = editorBackground
         gutterScrollView.backgroundColor = gutterBackground
         gutterTextView.backgroundColor = gutterBackground
+        textView.insertionPointColor = NSColor(theme.accent)
+        textView.selectedTextAttributes = [
+            .backgroundColor: NSColor(theme.selection),
+            .foregroundColor: NSColor(theme.textPrimary),
+        ]
+        editorScrollView.scrollerKnobStyle = isDark ? .light : .dark
 
-        gutterWidthConstraint.constant = showLineNumbers ? 48 : 0
+        gutterWidthConstraint.constant = showLineNumbers ? gutterWidth : 0
         gutterScrollView.isHidden = !showLineNumbers
 
         let needsHighlightRefresh = textView.string != text
             || currentLanguage != language
             || currentIsDark != isDark
             || currentFontSize != fontSize
+            || textView.selectedRange() != selection
 
         currentLanguage = language
         currentTheme = theme
@@ -157,13 +193,14 @@ private final class EditorTextContainerView: NSView {
         currentFontSize = fontSize
 
         if needsHighlightRefresh {
-            let highlighted = SyntaxHighlighter.highlightedText(
+            let highlighted = NSMutableAttributedString(attributedString: SyntaxHighlighter.highlightedText(
                 for: text,
                 language: language,
                 theme: theme,
                 isDark: isDark,
                 fontSize: fontSize
-            )
+            ))
+            highlightCurrentLine(in: highlighted, selection: selection, theme: theme)
             textView.textStorage?.setAttributedString(highlighted)
             textView.typingAttributes = SyntaxHighlighter.baseAttributes(theme: theme, fontSize: fontSize)
             refreshLineNumbers()
@@ -179,20 +216,33 @@ private final class EditorTextContainerView: NSView {
 
     func refreshLineNumbers() {
         let lineCount = max(1, textView.string.components(separatedBy: "\n").count)
-        let lineNumbers = (1...lineCount).map(String.init).joined(separator: "\n")
-        let paragraphStyle = NSMutableParagraphStyle()
+        let activeLine = currentLineNumber(for: textView.selectedRange())
+        let paragraphStyle = SyntaxHighlighter.paragraphStyle(fontSize: currentFontSize)
         paragraphStyle.alignment = .right
+        let attributed = NSMutableAttributedString()
 
-        gutterTextView.textStorage?.setAttributedString(
-            NSAttributedString(
-                string: lineNumbers,
-                attributes: [
-                    .font: NSFont.monospacedSystemFont(ofSize: max(11, currentFontSize - 2), weight: .medium),
-                    .foregroundColor: NSColor(currentTheme?.textSubtle ?? Color(nsColor: .secondaryLabelColor)),
-                    .paragraphStyle: paragraphStyle,
-                ]
-            )
-        )
+        for line in 1...lineCount {
+            let isActiveLine = line == activeLine
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: NSFont.monospacedSystemFont(
+                    ofSize: max(11, currentFontSize - 2),
+                    weight: isActiveLine ? .semibold : .medium
+                ),
+                .foregroundColor: NSColor(
+                    isActiveLine
+                        ? currentTheme?.accent ?? Color(nsColor: .labelColor)
+                        : currentTheme?.textSubtle ?? Color(nsColor: .secondaryLabelColor)
+                ),
+                .paragraphStyle: paragraphStyle,
+            ]
+            attributed.append(NSAttributedString(string: "\(line)"))
+            if line < lineCount {
+                attributed.append(NSAttributedString(string: "\n", attributes: attributes))
+            }
+            attributed.addAttributes(attributes, range: NSRange(location: attributed.length - "\(line)".count - (line < lineCount ? 1 : 0), length: "\(line)".count))
+        }
+
+        gutterTextView.textStorage?.setAttributedString(attributed)
     }
 
     func rehighlight(language: EditorFileFormat, theme: PaperTheme, isDark: Bool) {
@@ -200,16 +250,18 @@ private final class EditorTextContainerView: NSView {
         currentTheme = theme
         currentIsDark = isDark
         let selection = textView.selectedRange()
-        let highlighted = SyntaxHighlighter.highlightedText(
+        let highlighted = NSMutableAttributedString(attributedString: SyntaxHighlighter.highlightedText(
             for: textView.string,
             language: language,
             theme: theme,
             isDark: isDark,
             fontSize: currentFontSize
-        )
+        ))
+        highlightCurrentLine(in: highlighted, selection: selection, theme: theme)
         textView.textStorage?.setAttributedString(highlighted)
         textView.typingAttributes = SyntaxHighlighter.baseAttributes(theme: theme, fontSize: currentFontSize)
         textView.setSelectedRange(selection)
+        refreshLineNumbers()
     }
 
     private func configureLayout() {
@@ -236,8 +288,8 @@ private final class EditorTextContainerView: NSView {
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = true
         textView.autoresizingMask = [.width]
-        textView.textContainerInset = NSSize(width: 0, height: 16)
-        textView.textContainer?.lineFragmentPadding = 0
+        textView.textContainerInset = NSSize(width: 18, height: 20)
+        textView.textContainer?.lineFragmentPadding = 2
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
@@ -248,6 +300,7 @@ private final class EditorTextContainerView: NSView {
         textView.isRichText = false
         textView.importsGraphics = false
         textView.usesFindBar = true
+        textView.drawsBackground = true
 
         editorScrollView.drawsBackground = true
         editorScrollView.hasVerticalScroller = true
@@ -255,13 +308,14 @@ private final class EditorTextContainerView: NSView {
         editorScrollView.borderType = .noBorder
         editorScrollView.documentView = textView
         editorScrollView.contentView.postsBoundsChangedNotifications = true
+        editorScrollView.scrollerKnobStyle = currentIsDark ? .light : .dark
     }
 
     private func configureGutter() {
         gutterTextView.isEditable = false
         gutterTextView.isSelectable = false
         gutterTextView.drawsBackground = true
-        gutterTextView.textContainerInset = NSSize(width: 0, height: 16)
+        gutterTextView.textContainerInset = NSSize(width: 8, height: 20)
         gutterTextView.textContainer?.lineFragmentPadding = 0
         gutterTextView.font = NSFont.monospacedSystemFont(ofSize: max(11, WorkspaceStore.defaultEditorFontSize - 2), weight: .medium)
 
@@ -299,6 +353,24 @@ private final class EditorTextContainerView: NSView {
         gutterScrollView.reflectScrolledClipView(gutterScrollView.contentView)
     }
 
+    private func currentLineNumber(for selection: NSRange) -> Int {
+        let location = min(selection.location, (textView.string as NSString).length)
+        let prefix = (textView.string as NSString).substring(to: location)
+        return max(1, prefix.components(separatedBy: "\n").count)
+    }
+
+    private func highlightCurrentLine(
+        in attributed: NSMutableAttributedString,
+        selection: NSRange,
+        theme: PaperTheme
+    ) {
+        let text = attributed.string as NSString
+        guard text.length > 0 else { return }
+        let location = min(selection.location, text.length - 1)
+        let lineRange = text.lineRange(for: NSRange(location: location, length: 0))
+        attributed.addAttribute(.backgroundColor, value: NSColor(theme.currentLine), range: lineRange)
+    }
+
     private static func makeEditorTextView() -> NSTextView {
         let textStorage = NSTextStorage()
         let layoutManager = NSLayoutManager()
@@ -312,7 +384,7 @@ private final class EditorTextContainerView: NSView {
     private static func makeGutterTextView() -> NSTextView {
         let textStorage = NSTextStorage()
         let layoutManager = NSLayoutManager()
-        let textContainer = NSTextContainer(size: NSSize(width: 48, height: CGFloat.greatestFiniteMagnitude))
+        let textContainer = NSTextContainer(size: NSSize(width: 60, height: CGFloat.greatestFiniteMagnitude))
         textContainer.widthTracksTextView = true
         textStorage.addLayoutManager(layoutManager)
         layoutManager.addTextContainer(textContainer)
@@ -337,11 +409,21 @@ private enum SyntaxHighlighter {
     ) -> NSAttributedString {
         let attributed = NSMutableAttributedString(string: text, attributes: baseAttributes(theme: theme, fontSize: fontSize))
 
-        guard language == .shellScript else {
-            return attributed
+        switch language {
+        case .json:
+            highlightJSON(in: attributed, theme: theme, isDark: isDark, fontSize: fontSize)
+        case .yaml:
+            highlightYAML(in: attributed, theme: theme, isDark: isDark, fontSize: fontSize)
+        case .toml:
+            highlightTOML(in: attributed, theme: theme, isDark: isDark, fontSize: fontSize)
+        case .xml, .plist:
+            highlightXML(in: attributed, theme: theme, isDark: isDark, fontSize: fontSize)
+        case .shellScript:
+            highlightShell(in: attributed, theme: theme, isDark: isDark, fontSize: fontSize)
+        case .markdown, .plainText:
+            break
         }
 
-        highlightShell(in: attributed, theme: theme, isDark: isDark, fontSize: fontSize)
         return attributed
     }
 
@@ -349,7 +431,18 @@ private enum SyntaxHighlighter {
         [
             .font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular),
             .foregroundColor: NSColor(theme.textPrimary),
+            .paragraphStyle: paragraphStyle(fontSize: fontSize),
         ]
+    }
+
+    static func paragraphStyle(fontSize: CGFloat) -> NSMutableParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        let lineHeight = ceil(font.ascender - font.descender + font.leading + 2)
+        style.minimumLineHeight = lineHeight
+        style.maximumLineHeight = lineHeight
+        style.paragraphSpacing = 0
+        return style
     }
 
     private static func highlightShell(
@@ -478,6 +571,136 @@ private enum SyntaxHighlighter {
             }
 
             index += 1
+        }
+    }
+
+    private static func highlightJSON(
+        in attributed: NSMutableAttributedString,
+        theme: PaperTheme,
+        isDark: Bool,
+        fontSize: CGFloat
+    ) {
+        let keyAttributes = tokenAttributes(
+            color: NSColor(isDark ? Color(hex: "#F5C26B") : Color(hex: "#9A5B00")),
+            font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold)
+        )
+        let stringAttributes = tokenAttributes(color: NSColor(isDark ? Color(hex: "#A8E6A3") : Color(hex: "#1F7A2F")))
+        let numberAttributes = tokenAttributes(color: NSColor(isDark ? Color(hex: "#7DD3FC") : Color(hex: "#005A9C")))
+        let literalAttributes = tokenAttributes(
+            color: NSColor(isDark ? Color(hex: "#FF9F7A") : Color(hex: "#B42318")),
+            font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold)
+        )
+
+        apply(pattern: #""(?:\\.|[^"\\])*""#, attributes: stringAttributes, to: attributed)
+        apply(pattern: #""(?:\\.|[^"\\])*"(?=\s*:)"#, attributes: keyAttributes, to: attributed)
+        apply(pattern: #"(?<![\w.])-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?"#, attributes: numberAttributes, to: attributed)
+        apply(pattern: #"\b(?:true|false|null)\b"#, attributes: literalAttributes, to: attributed)
+    }
+
+    private static func highlightYAML(
+        in attributed: NSMutableAttributedString,
+        theme: PaperTheme,
+        isDark: Bool,
+        fontSize: CGFloat
+    ) {
+        let keyAttributes = tokenAttributes(
+            color: NSColor(isDark ? Color(hex: "#F5C26B") : Color(hex: "#9A5B00")),
+            font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold)
+        )
+        let stringAttributes = tokenAttributes(color: NSColor(isDark ? Color(hex: "#A8E6A3") : Color(hex: "#1F7A2F")))
+        let numberAttributes = tokenAttributes(color: NSColor(isDark ? Color(hex: "#7DD3FC") : Color(hex: "#005A9C")))
+        let literalAttributes = tokenAttributes(
+            color: NSColor(isDark ? Color(hex: "#FF9F7A") : Color(hex: "#B42318")),
+            font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold)
+        )
+        let commentAttributes = tokenAttributes(color: NSColor(theme.textSubtle))
+
+        apply(pattern: #"(?m)^(\s*-\s*)?([^\s:#][^:#\n]*?)(?=\s*:)"#, attributes: keyAttributes, to: attributed, group: 2)
+        apply(pattern: #""(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'"#, attributes: stringAttributes, to: attributed)
+        apply(pattern: #"(?<![\w.])-?(?:0|[1-9]\d*)(?:\.\d+)?"#, attributes: numberAttributes, to: attributed)
+        apply(pattern: #"\b(?:true|false|null|yes|no|on|off)\b"#, attributes: literalAttributes, to: attributed)
+        apply(pattern: #"(?m)#.*$"#, attributes: commentAttributes, to: attributed)
+    }
+
+    private static func highlightTOML(
+        in attributed: NSMutableAttributedString,
+        theme: PaperTheme,
+        isDark: Bool,
+        fontSize: CGFloat
+    ) {
+        let keyAttributes = tokenAttributes(
+            color: NSColor(isDark ? Color(hex: "#F5C26B") : Color(hex: "#9A5B00")),
+            font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold)
+        )
+        let sectionAttributes = tokenAttributes(
+            color: NSColor(isDark ? Color(hex: "#FF9F7A") : Color(hex: "#B42318")),
+            font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold)
+        )
+        let stringAttributes = tokenAttributes(color: NSColor(isDark ? Color(hex: "#A8E6A3") : Color(hex: "#1F7A2F")))
+        let numberAttributes = tokenAttributes(color: NSColor(isDark ? Color(hex: "#7DD3FC") : Color(hex: "#005A9C")))
+        let literalAttributes = tokenAttributes(
+            color: NSColor(isDark ? Color(hex: "#FF9F7A") : Color(hex: "#B42318")),
+            font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold)
+        )
+        let commentAttributes = tokenAttributes(color: NSColor(theme.textSubtle))
+
+        apply(pattern: #"(?m)^\s*(\[{1,2}[^\]\n]+\]{1,2})"#, attributes: sectionAttributes, to: attributed, group: 1)
+        apply(pattern: #"(?m)^\s*([A-Za-z0-9_.-]+)\s*(?==)"#, attributes: keyAttributes, to: attributed, group: 1)
+        apply(pattern: #""(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'"#, attributes: stringAttributes, to: attributed)
+        apply(pattern: #"(?<![\w.])-?(?:0|[1-9]\d*)(?:\.\d+)?"#, attributes: numberAttributes, to: attributed)
+        apply(pattern: #"\b(?:true|false)\b"#, attributes: literalAttributes, to: attributed)
+        apply(pattern: #"(?m)#.*$"#, attributes: commentAttributes, to: attributed)
+    }
+
+    private static func highlightXML(
+        in attributed: NSMutableAttributedString,
+        theme: PaperTheme,
+        isDark: Bool,
+        fontSize: CGFloat
+    ) {
+        let tagAttributes = tokenAttributes(
+            color: NSColor(isDark ? Color(hex: "#FF9F7A") : Color(hex: "#B42318")),
+            font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold)
+        )
+        let attributeNameAttributes = tokenAttributes(
+            color: NSColor(isDark ? Color(hex: "#F5C26B") : Color(hex: "#9A5B00")),
+            font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .medium)
+        )
+        let stringAttributes = tokenAttributes(color: NSColor(isDark ? Color(hex: "#A8E6A3") : Color(hex: "#1F7A2F")))
+        let commentAttributes = tokenAttributes(color: NSColor(theme.textSubtle))
+
+        apply(pattern: #"<!--[\s\S]*?-->"#, options: [.dotMatchesLineSeparators], attributes: commentAttributes, to: attributed)
+        apply(pattern: #"</?\s*([A-Za-z_][A-Za-z0-9_.:-]*)"#, attributes: tagAttributes, to: attributed, group: 1)
+        apply(pattern: #"\s([A-Za-z_][A-Za-z0-9_.:-]*)(?=\s*=)"#, attributes: attributeNameAttributes, to: attributed, group: 1)
+        apply(pattern: #""(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'"#, attributes: stringAttributes, to: attributed)
+    }
+
+    private static func tokenAttributes(
+        color: NSColor,
+        font: NSFont? = nil
+    ) -> [NSAttributedString.Key: Any] {
+        var attributes: [NSAttributedString.Key: Any] = [.foregroundColor: color]
+        if let font {
+            attributes[.font] = font
+        }
+        return attributes
+    }
+
+    private static func apply(
+        pattern: String,
+        options: NSRegularExpression.Options = [],
+        attributes: [NSAttributedString.Key: Any],
+        to attributed: NSMutableAttributedString,
+        group: Int = 0
+    ) {
+        guard let expression = try? NSRegularExpression(pattern: pattern, options: options) else { return }
+        let fullRange = NSRange(location: 0, length: (attributed.string as NSString).length)
+
+        expression.enumerateMatches(in: attributed.string, options: [], range: fullRange) { match, _, _ in
+            guard let match else { return }
+            let targetRange = match.range(at: group)
+            guard targetRange.location != NSNotFound else { return }
+            attributed.addAttributes(attributes, range: targetRange)
         }
     }
 }

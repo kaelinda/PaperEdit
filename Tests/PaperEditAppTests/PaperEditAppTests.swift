@@ -485,6 +485,16 @@ import Testing
     #expect(titles.contains("features"))
 }
 
+@Test func reportsInvalidJSONDiagnostics() {
+    let document = StructuredPreviewBuilder.build(
+        format: .json,
+        text: #"{"name":"paperedit""#
+    )
+
+    #expect(!document.diagnostics.isEmpty)
+    #expect(document.nodes.isEmpty)
+}
+
 @Test func buildsStructuredPreviewForYAML() {
     let document = StructuredPreviewBuilder.build(
         format: .yaml,
@@ -533,6 +543,16 @@ import Testing
     #expect(titles.contains("id"))
 }
 
+@Test func reportsInvalidXMLDiagnostics() {
+    let document = StructuredPreviewBuilder.build(
+        format: .xml,
+        text: #"<root><item></root>"#
+    )
+
+    #expect(!document.diagnostics.isEmpty)
+    #expect(document.nodes.isEmpty)
+}
+
 @Test func buildsStructuredPreviewForPlist() {
     let document = StructuredPreviewBuilder.build(
         format: .plist,
@@ -558,6 +578,20 @@ import Testing
     #expect(titles.contains("Property List Root"))
     #expect(titles.contains("name"))
     #expect(titles.contains("formats"))
+}
+
+@Test func reportsInvalidTOMLDiagnostics() {
+    let document = StructuredPreviewBuilder.build(
+        format: .toml,
+        text: """
+        [workspace]
+        name = "paperedit"
+        invalid line
+        """
+    )
+
+    #expect(document.diagnostics.count == 1)
+    #expect(document.diagnostics[0].contains("Line 3"))
 }
 
 @Test func detectsShellScriptFormats() {

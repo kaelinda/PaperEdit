@@ -18,33 +18,35 @@ struct StructuredPreviewContainer: View {
     }
 
     var body: some View {
+        let document = previewDocument
+
         switch viewMode {
         case .edit:
-            editorPane
+            editorPane(document: document)
         case .split:
             if isCompactWidth {
                 VStack(spacing: 0) {
                     compactSplitSwitcher
 
                     if compactSplitShowsPreview {
-                        structuredPreview
+                        structuredPreview(document: document)
                     } else {
-                        editorPane
+                        editorPane(document: document)
                     }
                 }
             } else {
                 HSplitView {
-                    editorPane
+                    editorPane(document: document)
                         .frame(minWidth: 360)
 
-                    structuredPreview
+                    structuredPreview(document: document)
                         .frame(minWidth: 360)
                 }
             }
         case .wysiwyg:
             VStack(alignment: .leading, spacing: 0) {
                 previewHeader
-                structuredPreview
+                structuredPreview(document: document)
             }
         }
     }
@@ -88,26 +90,38 @@ struct StructuredPreviewContainer: View {
         }
     }
 
-    private var editorPane: some View {
-        CodeEditorView(
-            text: tab.text,
-            language: tab.format,
-            selection: tab.selection,
-            fontSize: workspaceStore.editorFontSize,
-            showLineNumbers: true,
-            showsFolding: tab.showsFolding,
-            theme: theme,
-            isDark: isDark,
-            foldMarkers: tab.foldMarkers,
-            onTextChange: onTextChange,
-            onSelectionChange: onSelectionChange,
-            onToggleFold: onToggleFold
-        )
+    private func editorPane(document: StructuredPreviewDocument) -> some View {
+        EditorPaneSurface(theme: theme, isDark: isDark) {
+            VStack(spacing: 0) {
+                if !document.diagnostics.isEmpty {
+                    validationBanner(document: document)
+                        .padding(.horizontal, 14)
+                        .padding(.top, 14)
+                        .padding(.bottom, 10)
+                }
+
+                CodeEditorView(
+                    text: tab.text,
+                    language: tab.format,
+                    selection: tab.selection,
+                    fontSize: workspaceStore.editorFontSize,
+                    showLineNumbers: true,
+                    showsFolding: tab.showsFolding,
+                    theme: theme,
+                    isDark: isDark,
+                    foldMarkers: tab.foldMarkers,
+                    onTextChange: onTextChange,
+                    onSelectionChange: onSelectionChange,
+                    onToggleFold: onToggleFold
+                )
+            }
+        }
+        .padding(.horizontal, isCompactWidth ? 14 : 18)
+        .padding(.vertical, isCompactWidth ? 14 : 18)
+        .background(theme.canvasBackground)
     }
 
-    private var structuredPreview: some View {
-        let document = previewDocument
-
+    private func structuredPreview(document: StructuredPreviewDocument) -> some View {
         return ScrollView {
             VStack(spacing: 24) {
                 VStack(alignment: .leading, spacing: 18) {
@@ -145,6 +159,45 @@ struct StructuredPreviewContainer: View {
             .frame(maxWidth: .infinity)
         }
         .background(theme.canvasBackground)
+    }
+
+    private func validationBanner(document: StructuredPreviewDocument) -> some View {
+        let remainingCount = max(0, document.diagnostics.count - 1)
+
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color(hex: "#B86B00"))
+
+                Text("\(tab.format.displayName) validation")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(theme.textPrimary)
+
+                Text("\(document.diagnostics.count) issue\(document.diagnostics.count == 1 ? "" : "s")")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(theme.textSubtle)
+
+                Spacer(minLength: 0)
+            }
+
+            Text(document.diagnostics[0])
+                .font(.system(size: 12))
+                .foregroundStyle(theme.textMuted)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if remainingCount > 0 {
+                Text("And \(remainingCount) more validation message\(remainingCount == 1 ? "" : "s") in preview.")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(theme.textSubtle)
+            }
+        }
+        .padding(12)
+        .background(Color(hex: "#FFCC00").opacity(isDark ? 0.12 : 0.16), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(hex: "#B86B00").opacity(0.25), lineWidth: 1)
+        )
     }
 
     private var previewHeader: some View {

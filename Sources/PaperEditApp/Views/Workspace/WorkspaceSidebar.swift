@@ -6,28 +6,28 @@ struct WorkspaceSidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text("Files")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(theme.textMuted)
-                    .tracking(0.4)
+                    .tracking(0.35)
 
                 searchField
 
                 if workspaceStore.showQuickOpen {
                     QuickOpenPanelView(theme: theme)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .transition(.opacity)
                         .zIndex(1)
                 }
 
                 if let workspaceRootURL = workspaceStore.workspaceRootURL {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 7) {
                         Image(systemName: "folder")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                         Text(workspaceRootURL.lastPathComponent)
                             .lineLimit(1)
                     }
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(theme.textSubtle)
                 }
             }
@@ -41,7 +41,7 @@ struct WorkspaceSidebar: View {
             }
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 16) {
                     SidebarSectionView(theme: theme, section: .favorites, nodes: workspaceStore.favoriteFiles)
                     SidebarSectionView(theme: theme, section: .recent, nodes: workspaceStore.recentProjects)
                     SidebarSectionView(
@@ -53,7 +53,7 @@ struct WorkspaceSidebar: View {
                     )
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 16)
+                .padding(.vertical, 18)
             }
         }
         .background(sidebarBackground)
@@ -63,24 +63,24 @@ struct WorkspaceSidebar: View {
         Button {
             workspaceStore.openQuickOpen(prefill: workspaceStore.quickOpenModel.query)
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 9) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.textSubtle)
 
                 Text(quickOpenEntryTitle)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(workspaceStore.quickOpenModel.query.isEmpty ? theme.textMuted : theme.textPrimary)
                     .lineLimit(1)
 
                 Spacer(minLength: 0)
 
                 Text("⌘P")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(theme.textSubtle)
             }
             .padding(.horizontal, 12)
-            .frame(height: 32)
+            .frame(height: 36)
             .background(theme.secondaryElevatedBackground, in: Capsule(style: .continuous))
             .overlay(
                 Capsule(style: .continuous)
@@ -111,6 +111,7 @@ struct WorkspaceSidebar: View {
 
 private struct SidebarSectionView: View {
     @EnvironmentObject private var workspaceStore: WorkspaceStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let theme: PaperTheme
     let section: SidebarSection
     let nodes: [FileTreeNode]
@@ -118,35 +119,43 @@ private struct SidebarSectionView: View {
     var emptyAction: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 7) {
             Button {
-                workspaceStore.toggleSidebarSection(section)
+                withAnimation(sidebarAnimation) {
+                    workspaceStore.toggleSidebarSection(section)
+                }
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 7) {
                     Image(systemName: workspaceStore.sidebarSections.contains(section) ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.system(size: 10, weight: .bold))
+                        .frame(width: 12)
                     Text(section.title)
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(0.6)
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(0.55)
                     Spacer()
                 }
                 .foregroundStyle(theme.textMuted)
                 .padding(.horizontal, 8)
+                .frame(height: 24)
             }
             .buttonStyle(.plain)
 
             if workspaceStore.sidebarSections.contains(section) {
-                if nodes.isEmpty {
-                    sectionEmptyState
-                } else {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(nodes) { node in
-                            FileTreeNodeRow(node: node, depth: 0, theme: theme)
+                Group {
+                    if nodes.isEmpty {
+                        sectionEmptyState
+                    } else {
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(nodes) { node in
+                                FileTreeNodeRow(node: node, depth: 0, theme: theme)
+                            }
                         }
                     }
                 }
+                .transition(.opacity)
             }
         }
+        .animation(sidebarAnimation, value: workspaceStore.sidebarSections.contains(section))
     }
 
     @ViewBuilder
@@ -155,22 +164,22 @@ private struct SidebarSectionView: View {
             Button(action: emptyAction) {
                 HStack(spacing: 8) {
                     Image(systemName: "folder.badge.plus")
-                        .font(.system(size: 11, weight: .medium))
-                    Text(emptyActionTitle)
                         .font(.system(size: 12, weight: .medium))
+                    Text(emptyActionTitle)
+                        .font(.system(size: 13, weight: .medium))
                     Spacer()
                 }
                 .foregroundStyle(theme.textMuted)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 7)
+                .frame(height: 32)
             }
             .buttonStyle(.plain)
         } else {
             Text(emptyStateCopy)
-                .font(.system(size: 12))
+                .font(.system(size: 13))
                 .foregroundStyle(theme.textMuted)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.vertical, 9)
         }
     }
 
@@ -184,10 +193,15 @@ private struct SidebarSectionView: View {
             "Open a folder to browse files."
         }
     }
+
+    private var sidebarAnimation: Animation {
+        reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.26, dampingFraction: 0.88, blendDuration: 0.06)
+    }
 }
 
 private struct FileTreeNodeRow: View {
     @EnvironmentObject private var workspaceStore: WorkspaceStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovering = false
     let node: FileTreeNode
     let depth: Int
@@ -205,25 +219,25 @@ private struct FileTreeNodeRow: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 8) {
                 Button(action: primaryAction) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 9) {
                         if isContainer {
                             Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(.system(size: 10, weight: .bold))
                                 .foregroundStyle(theme.textMuted)
-                                .frame(width: 10)
+                                .frame(width: 12)
                         } else {
                             Spacer()
-                                .frame(width: 10)
+                                .frame(width: 12)
                         }
 
                         Image(systemName: iconName)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(iconColor)
-                            .frame(width: 14)
+                            .frame(width: 16)
 
                         Text(node.name)
                             .lineLimit(1)
-                            .font(.system(size: 12, weight: node.kind == .group || node.kind == .project ? .medium : .regular))
+                            .font(.system(size: 13, weight: node.kind == .group || node.kind == .project ? .medium : .regular))
                             .foregroundStyle(theme.textPrimary.opacity(node.kind == .project ? 0.9 : 1))
 
                         Spacer(minLength: 0)
@@ -238,32 +252,37 @@ private struct FileTreeNodeRow: View {
                         workspaceStore.toggleFavorite(sourceURL)
                     } label: {
                         Image(systemName: workspaceStore.isFavorite(sourceURL) ? "star.fill" : "star")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(workspaceStore.isFavorite(sourceURL) ? theme.accent : theme.textSubtle)
+                            .frame(width: 18, height: 18)
                     }
                     .buttonStyle(.plain)
                 }
             }
             .contentShape(Rectangle())
-            .padding(.leading, CGFloat(depth) * 12 + 10)
+            .padding(.leading, CGFloat(depth) * 13 + 10)
             .padding(.trailing, 10)
-            .padding(.vertical, 6)
+            .frame(height: 32)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(isSelected ? theme.selectedItemFill : .clear)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .stroke(isSelected ? theme.selectedItemStroke : .clear, lineWidth: 1)
             )
             .onHover { hovering = $0 }
 
             if isExpanded, !node.children.isEmpty {
-                ForEach(node.children) { child in
-                    FileTreeNodeRow(node: child, depth: depth + 1, theme: theme)
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(node.children) { child in
+                        FileTreeNodeRow(node: child, depth: depth + 1, theme: theme)
+                    }
                 }
+                .transition(.opacity)
             }
         }
+        .animation(sidebarAnimation, value: isExpanded)
     }
 
     private var iconName: String {
@@ -305,9 +324,15 @@ private struct FileTreeNodeRow: View {
         case .file:
             workspaceStore.openFileTreeNode(node)
         case .folder, .group:
-            workspaceStore.toggleNodeExpansion(node.id)
+            withAnimation(sidebarAnimation) {
+                workspaceStore.toggleNodeExpansion(node.id)
+            }
         case .project:
             break
         }
+    }
+
+    private var sidebarAnimation: Animation {
+        reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.24, dampingFraction: 0.86, blendDuration: 0.05)
     }
 }

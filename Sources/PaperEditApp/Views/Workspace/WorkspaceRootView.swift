@@ -5,6 +5,7 @@ struct WorkspaceRootView: View {
     @EnvironmentObject private var workspaceStore: WorkspaceStore
     @EnvironmentObject private var settingsModel: SettingsWindowModel
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isDropTargeted = false
 
     private var theme: PaperTheme {
@@ -26,6 +27,8 @@ struct WorkspaceRootView: View {
         GeometryReader { geometry in
             let isCompactWidth = geometry.size.width < 980
             let effectiveSidebarWidth = isCompactWidth ? min(workspaceStore.sidebarWidth, 220) : workspaceStore.sidebarWidth
+            let sidebarReferenceWidth: CGFloat = isCompactWidth ? 220 : 240
+            let sidebarRevealProgress = min(1, max(0, effectiveSidebarWidth / sidebarReferenceWidth))
             let titlebarTopInset = geometry.safeAreaInsets.top
 
             ZStack {
@@ -47,15 +50,27 @@ struct WorkspaceRootView: View {
                     WorkspaceTitleBar(theme: theme, isCompactWidth: isCompactWidth, topInset: titlebarTopInset)
 
                     HStack(spacing: 0) {
-                        if effectiveSidebarWidth > 0 {
+                        ZStack(alignment: .leading) {
                             WorkspaceSidebar(theme: theme)
-                                .frame(width: effectiveSidebarWidth)
-
-                            SidebarResizeHandle(theme: theme)
+                                .frame(width: sidebarReferenceWidth)
+                                .opacity(sidebarRevealProgress)
+                                .offset(x: -18 * (1 - sidebarRevealProgress))
                         }
+                        .frame(width: effectiveSidebarWidth, alignment: .leading)
+                        .shadow(color: theme.shadow.opacity(0.08 * sidebarRevealProgress), radius: 14, x: 3, y: 0)
+                        .contentShape(Rectangle())
+                        .allowsHitTesting(sidebarRevealProgress > 0.96)
+                        .clipped()
+
+                        SidebarResizeHandle(theme: theme)
+                            .frame(width: max(0, 8 * sidebarRevealProgress))
+                            .opacity(sidebarRevealProgress)
+                            .clipped()
+                            .allowsHitTesting(sidebarRevealProgress > 0.98)
 
                         editorRegion(isCompactWidth: isCompactWidth)
                     }
+                    .animation(sidebarAnimation, value: effectiveSidebarWidth)
 
                     WorkspaceStatusBar(theme: theme, status: workspaceStore.status)
                 }
@@ -110,21 +125,25 @@ struct WorkspaceRootView: View {
                         onToggleFold: tab.format == .json ? { _ in workspaceStore.togglePrimaryJSONFold() } : nil
                     )
                 } else {
-                    CodeEditorView(
-                        text: tab.text,
-                        language: tab.format,
-                        selection: tab.selection,
-                        fontSize: workspaceStore.editorFontSize,
-                        showLineNumbers: true,
-                        showsFolding: tab.showsFolding,
-                        theme: theme,
-                        isDark: isDarkTheme,
-                        foldMarkers: tab.foldMarkers,
-                        onTextChange: workspaceStore.updateText(_:selection:),
-                        onSelectionChange: workspaceStore.updateSelection(_:)
-                    ) { _ in
-                        workspaceStore.togglePrimaryJSONFold()
+                    EditorPaneSurface(theme: theme, isDark: isDarkTheme) {
+                        CodeEditorView(
+                            text: tab.text,
+                            language: tab.format,
+                            selection: tab.selection,
+                            fontSize: workspaceStore.editorFontSize,
+                            showLineNumbers: true,
+                            showsFolding: tab.showsFolding,
+                            theme: theme,
+                            isDark: isDarkTheme,
+                            foldMarkers: tab.foldMarkers,
+                            onTextChange: workspaceStore.updateText(_:selection:),
+                            onSelectionChange: workspaceStore.updateSelection(_:)
+                        ) { _ in
+                            workspaceStore.togglePrimaryJSONFold()
+                        }
                     }
+                    .padding(18)
+                    .background(theme.canvasBackground)
                 }
             } else {
                 EmptyStateView(theme: theme, isDropTargeted: isDropTargeted)
@@ -141,6 +160,10 @@ struct WorkspaceRootView: View {
         case .dark: .dark
         case .system: nil
         }
+    }
+
+    private var sidebarAnimation: Animation {
+        reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.34, dampingFraction: 0.88, blendDuration: 0.08)
     }
 }
 

@@ -151,7 +151,19 @@ struct WorkspaceTitleBar: View {
             }
 
             HStack(spacing: 4) {
-                ToolbarIconButton(symbol: "sidebar.right", theme: theme) {
+                ToolbarIconButton(
+                    symbol: themeToggleSymbol,
+                    theme: theme,
+                    accessibilityLabel: themeToggleAccessibilityLabel
+                ) {
+                    workspaceStore.toggleTheme()
+                }
+                ToolbarIconButton(
+                    symbol: "sidebar.right",
+                    theme: theme,
+                    isActive: workspaceStore.sidebarWidth > 0,
+                    accessibilityLabel: "Toggle Sidebar"
+                ) {
                     workspaceStore.toggleSidebarCollapse()
                 }
                 ToolbarIconButton(symbol: "rectangle.split.2x1", theme: theme) {
@@ -163,6 +175,24 @@ struct WorkspaceTitleBar: View {
             }
             .padding(4)
             .background(toolbarCapsuleBackground)
+        }
+    }
+
+    private var themeToggleSymbol: String {
+        switch workspaceStore.themeMode {
+        case .dark:
+            "sun.max"
+        case .light, .system:
+            "moon"
+        }
+    }
+
+    private var themeToggleAccessibilityLabel: String {
+        switch workspaceStore.themeMode {
+        case .dark:
+            "Switch to Light Mode"
+        case .light, .system:
+            "Switch to Dark Mode"
         }
     }
 
@@ -211,6 +241,8 @@ struct WorkspaceTitleBar: View {
 private struct ToolbarIconButton: View {
     let symbol: String
     let theme: PaperTheme
+    var isActive = false
+    var accessibilityLabel: String?
     let action: () -> Void
     @State private var hovering = false
 
@@ -218,16 +250,57 @@ private struct ToolbarIconButton: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .medium))
-                .frame(width: 30, height: 30)
-                .foregroundStyle(hovering ? theme.textPrimary : theme.textMuted)
-                .background(
-                    Circle()
-                        .fill(hovering ? theme.hover : .clear)
-                )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ToolbarIconButtonStyle(theme: theme, hovering: hovering, isActive: isActive))
         .contentShape(Circle())
-        .onHover { hovering = $0 }
+        .onHover { isHovering in
+            withAnimation(.easeOut(duration: 0.14)) {
+                hovering = isHovering
+            }
+        }
+        .accessibilityLabel(accessibilityLabel ?? symbol)
+        .accessibilityValue(isActive ? "Active" : "")
+    }
+}
+
+private struct ToolbarIconButtonStyle: ButtonStyle {
+    let theme: PaperTheme
+    let hovering: Bool
+    let isActive: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(width: 30, height: 30)
+            .foregroundStyle(foregroundColor)
+            .background(
+                Circle()
+                    .fill(backgroundColor(isPressed: configuration.isPressed))
+            )
+            .overlay(
+                Circle()
+                    .stroke(isActive ? theme.selectedItemStroke : .clear, lineWidth: 1)
+            )
+            .scaleEffect(configuration.isPressed ? 0.94 : hovering ? 1.035 : 1)
+            .animation(.spring(response: 0.18, dampingFraction: 0.78, blendDuration: 0.04), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.14), value: hovering)
+            .animation(.easeOut(duration: 0.18), value: isActive)
+    }
+
+    private var foregroundColor: Color {
+        if isActive {
+            return theme.accent
+        }
+        return hovering ? theme.textPrimary : theme.textMuted
+    }
+
+    private func backgroundColor(isPressed: Bool) -> Color {
+        if isPressed {
+            return theme.pressed
+        }
+        if isActive {
+            return theme.selectedItemFill
+        }
+        return hovering ? theme.hover : .clear
     }
 }
 
