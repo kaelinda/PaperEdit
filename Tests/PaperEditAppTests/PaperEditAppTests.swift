@@ -32,6 +32,18 @@ import Testing
 }
 
 @MainActor
+@Test func openingQuickOpenRevealsCollapsedSidebar() {
+    let store = WorkspaceStore()
+
+    store.updateSidebarWidth(80)
+    #expect(store.sidebarWidth == 0)
+
+    store.openQuickOpen()
+    #expect(store.showQuickOpen == true)
+    #expect(store.sidebarWidth == 200)
+}
+
+@MainActor
 @Test func opensExternalFilesAsTabs() throws {
     let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
@@ -216,6 +228,22 @@ import Testing
 
     #expect(store.openTabs.count == 1)
     #expect(store.activeTabID == existingTabID)
+}
+
+@MainActor
+@Test func quickOpenSelectionClampsToAvailableResults() {
+    let model = QuickOpenModel()
+
+    model.selectedIndex = 1
+    model.moveSelection(delta: 10, itemCount: 3)
+    #expect(model.selectedIndex == 2)
+
+    model.moveSelection(delta: -10, itemCount: 3)
+    #expect(model.selectedIndex == 0)
+
+    model.selectedIndex = 2
+    model.moveSelection(delta: 1, itemCount: 0)
+    #expect(model.selectedIndex == 0)
 }
 
 @MainActor

@@ -14,6 +14,12 @@ struct WorkspaceSidebar: View {
 
                 searchField
 
+                if workspaceStore.showQuickOpen {
+                    QuickOpenPanelView(theme: theme)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .zIndex(1)
+                }
+
                 if let workspaceRootURL = workspaceStore.workspaceRootURL {
                     HStack(spacing: 6) {
                         Image(systemName: "folder")
@@ -36,12 +42,12 @@ struct WorkspaceSidebar: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    SidebarSectionView(theme: theme, section: .favorites, nodes: filtered(nodes: workspaceStore.favoriteFiles))
-                    SidebarSectionView(theme: theme, section: .recent, nodes: filtered(nodes: workspaceStore.recentProjects))
+                    SidebarSectionView(theme: theme, section: .favorites, nodes: workspaceStore.favoriteFiles)
+                    SidebarSectionView(theme: theme, section: .recent, nodes: workspaceStore.recentProjects)
                     SidebarSectionView(
                         theme: theme,
                         section: .explorer,
-                        nodes: filtered(nodes: workspaceStore.explorerFiles),
+                        nodes: workspaceStore.explorerFiles,
                         emptyActionTitle: "Open Folder",
                         emptyAction: workspaceStore.presentOpenFolderPanel
                     )
@@ -54,23 +60,39 @@ struct WorkspaceSidebar: View {
     }
 
     private var searchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(theme.textSubtle)
+        Button {
+            workspaceStore.openQuickOpen(prefill: workspaceStore.quickOpenModel.query)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(theme.textSubtle)
 
-            TextField("Search files", text: $workspaceStore.searchText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
-                .foregroundStyle(theme.textPrimary)
+                Text(quickOpenEntryTitle)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(workspaceStore.quickOpenModel.query.isEmpty ? theme.textMuted : theme.textPrimary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+
+                Text("⌘P")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(theme.textSubtle)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(theme.secondaryElevatedBackground, in: Capsule(style: .continuous))
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(workspaceStore.showQuickOpen ? theme.selectedItemStroke : theme.border, lineWidth: 1)
+            )
         }
-        .padding(.horizontal, 12)
-        .frame(height: 32)
-        .background(theme.secondaryElevatedBackground, in: Capsule(style: .continuous))
-        .overlay(
-            Capsule(style: .continuous)
-                .stroke(theme.border, lineWidth: 1)
-        )
+        .buttonStyle(.plain)
+    }
+
+    private var quickOpenEntryTitle: String {
+        let query = workspaceStore.quickOpenModel.query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return query.isEmpty ? "Quick Open" : query
     }
 
     @ViewBuilder
@@ -85,30 +107,6 @@ struct WorkspaceSidebar: View {
         }
     }
 
-    private func filtered(nodes: [FileTreeNode]) -> [FileTreeNode] {
-        let query = workspaceStore.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return nodes }
-
-        return nodes.compactMap { node in
-            filter(node: node, query: query.lowercased())
-        }
-    }
-
-    private func filter(node: FileTreeNode, query: String) -> FileTreeNode? {
-        let matches = node.name.lowercased().contains(query)
-        let filteredChildren = node.children.compactMap { filter(node: $0, query: query) }
-        if matches || !filteredChildren.isEmpty {
-            return FileTreeNode(
-                id: node.id,
-                name: node.name,
-                kind: node.kind,
-                format: node.format,
-                sourceURL: node.sourceURL,
-                children: filteredChildren
-            )
-        }
-        return nil
-    }
 }
 
 private struct SidebarSectionView: View {

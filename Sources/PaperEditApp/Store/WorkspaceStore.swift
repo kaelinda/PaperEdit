@@ -19,7 +19,6 @@ final class WorkspaceStore: ObservableObject {
     @Published var showSettings = false
     @Published var activeScene: DemoScene = .lightMarkdownSplit
     @Published var status = EditorStatus.empty
-    @Published var searchText = ""
     @Published var sidebarMaterialStyle: SidebarMaterialStyle = .translucent
     @Published var accentSwatch: AccentSwatch = .blue
     @Published var sidebarSections: Set<SidebarSection> = Set(SidebarSection.allCases)
@@ -400,6 +399,9 @@ final class WorkspaceStore: ObservableObject {
 
     func openQuickOpen(prefill: String = "") {
         closeCommandPalette()
+        if sidebarWidth < minSidebarWidth {
+            sidebarWidth = minSidebarWidth
+        }
         showQuickOpen = true
         quickOpenModel.reset()
         quickOpenModel.query = prefill
