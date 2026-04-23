@@ -35,7 +35,6 @@ final class WorkspaceStore: ObservableObject {
     let commandPaletteModel = CommandPaletteModel()
     let quickOpenModel = QuickOpenModel()
     private let defaults: UserDefaults
-    private var workspaceFileIndexRootPath: String?
     private var workspaceFileIndex: [URL] = []
 
     private var untitledIndex = 1
@@ -404,7 +403,6 @@ final class WorkspaceStore: ObservableObject {
         showQuickOpen = true
         quickOpenModel.reset()
         quickOpenModel.query = prefill
-        refreshWorkspaceFileIndex()
     }
 
     func closeQuickOpen() {
@@ -413,13 +411,13 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func quickOpenItems(matching rawQuery: String? = nil) -> [QuickOpenItem] {
-        ensureWorkspaceFileIndexIsCurrent()
         let query = (rawQuery ?? quickOpenModel.query)
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         var seenPaths = Set<String>()
 
         let workspaceMatches = workspaceFileIndex
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
             .filter { query.isEmpty || $0.lastPathComponent.lowercased().contains(query) }
             .compactMap { url -> QuickOpenItem? in
                 guard seenPaths.insert(normalizedFilePath(for: url)).inserted else { return nil }
@@ -430,9 +428,10 @@ final class WorkspaceStore: ObservableObject {
                     format: EditorFileFormat(fileURL: url),
                     source: .workspace
                 )
-            }
+        }
 
         let recentMatches = recentFileURLs
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
             .filter { query.isEmpty || $0.lastPathComponent.lowercased().contains(query) }
             .compactMap { url -> QuickOpenItem? in
                 guard seenPaths.insert(normalizedFilePath(for: url)).inserted else { return nil }
@@ -449,6 +448,7 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func openQuickOpenItem(_ item: QuickOpenItem) {
+        guard FileManager.default.fileExists(atPath: item.sourceURL.path) else { return }
         openExternalFiles([item.sourceURL])
         closeQuickOpen()
     }
@@ -643,28 +643,12 @@ final class WorkspaceStore: ObservableObject {
         return collectWorkspaceFileURLs(in: workspaceRootURL, depth: 0)
     }
 
-    private func ensureWorkspaceFileIndexIsCurrent() {
-        guard let workspaceRootURL else {
-            if !workspaceFileIndex.isEmpty {
-                refreshWorkspaceFileIndex()
-            }
-            return
-        }
-
-        let rootPath = normalizedFilePath(for: workspaceRootURL)
-        if workspaceFileIndexRootPath != rootPath || workspaceFileIndex.isEmpty {
-            refreshWorkspaceFileIndex()
-        }
-    }
-
     private func refreshWorkspaceFileIndex() {
-        guard let workspaceRootURL else {
-            workspaceFileIndexRootPath = nil
+        guard workspaceRootURL != nil else {
             workspaceFileIndex = []
             return
         }
 
-        workspaceFileIndexRootPath = normalizedFilePath(for: workspaceRootURL)
         workspaceFileIndex = collectWorkspaceFileURLs()
     }
 

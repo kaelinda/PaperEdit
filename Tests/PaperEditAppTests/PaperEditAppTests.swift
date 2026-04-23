@@ -100,6 +100,37 @@ import Testing
 }
 
 @MainActor
+@Test func quickOpenOmitsDeletedRecentFilesAndRefusesToOpenThem() throws {
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let recentURL = tempDirectory.appendingPathComponent("draft.md")
+    try "# draft\n".write(to: recentURL, atomically: true, encoding: .utf8)
+
+    let store = WorkspaceStore()
+    store.recentFileURLs = [recentURL]
+    store.openQuickOpen(prefill: "draft")
+
+    try FileManager.default.removeItem(at: recentURL)
+
+    let results = store.quickOpenItems()
+    #expect(results.isEmpty)
+
+    let staleItem = QuickOpenItem(
+        title: "draft.md",
+        subtitle: tempDirectory.path,
+        sourceURL: recentURL,
+        format: .markdown,
+        source: .recent
+    )
+    store.openQuickOpenItem(staleItem)
+
+    #expect(store.openTabs.isEmpty)
+    #expect(store.showQuickOpen == true)
+}
+
+@MainActor
 @Test func openingQuickOpenItemFocusesExistingTabInsteadOfDuplicatingIt() throws {
     let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
