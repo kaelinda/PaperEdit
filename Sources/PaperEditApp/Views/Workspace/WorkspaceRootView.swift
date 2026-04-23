@@ -114,6 +114,7 @@ struct WorkspaceRootView: View {
                         text: tab.text,
                         language: tab.format,
                         selection: tab.selection,
+                        fontSize: workspaceStore.editorFontSize,
                         showLineNumbers: true,
                         showsFolding: tab.showsFolding,
                         theme: theme,

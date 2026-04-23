@@ -7,7 +7,10 @@ final class WorkspaceStore: ObservableObject {
         static let favoriteFiles = "paperedit.favorite-files"
         static let recentFiles = "paperedit.recent-files"
         static let workspaceRoot = "paperedit.workspace-root"
+        static let editorFontSize = "paperedit.editor-font-size"
     }
+
+    static let defaultEditorFontSize: CGFloat = 14
 
     @Published var openTabs: [EditorTab] = []
     @Published var activeTabID: EditorTab.ID?
@@ -20,6 +23,7 @@ final class WorkspaceStore: ObservableObject {
     @Published var showSettings = false
     @Published var activeScene: DemoScene = .lightMarkdownSplit
     @Published var status = EditorStatus.empty
+    @Published var editorFontSize: CGFloat = WorkspaceStore.defaultEditorFontSize
     @Published var sidebarMaterialStyle: SidebarMaterialStyle = .translucent
     @Published var accentSwatch: AccentSwatch = .blue
     @Published var sidebarSections: Set<SidebarSection> = Set(SidebarSection.allCases)
@@ -38,6 +42,8 @@ final class WorkspaceStore: ObservableObject {
     private var workspaceFileIndex: [URL] = []
 
     private var untitledIndex = 1
+    private let minEditorFontSize: CGFloat = 11
+    private let maxEditorFontSize: CGFloat = 24
     private let minSidebarWidth: CGFloat = 200
     private let maxSidebarWidth: CGFloat = 320
     private let collapsedSidebarWidth: CGFloat = 0
@@ -359,6 +365,14 @@ final class WorkspaceStore: ObservableObject {
         persistState()
     }
 
+    func increaseEditorFontSize() {
+        setEditorFontSize(editorFontSize + 1)
+    }
+
+    func decreaseEditorFontSize() {
+        setEditorFontSize(editorFontSize - 1)
+    }
+
     @discardableResult
     func saveActiveTab() -> Bool {
         guard let index = activeTabIndex else { return false }
@@ -626,6 +640,7 @@ final class WorkspaceStore: ObservableObject {
         defaults.set(favoriteFileURLs.map(\.path), forKey: StorageKey.favoriteFiles)
         defaults.set(recentFileURLs.map(\.path), forKey: StorageKey.recentFiles)
         defaults.set(workspaceRootURL?.path, forKey: StorageKey.workspaceRoot)
+        defaults.set(Double(editorFontSize), forKey: StorageKey.editorFontSize)
     }
 
     private func restorePersistentState() {
@@ -642,6 +657,10 @@ final class WorkspaceStore: ObservableObject {
                 workspaceRootURL = url
                 expandedNodeIDs.insert(url.path)
             }
+        }
+
+        if let storedEditorFontSize = defaults.object(forKey: StorageKey.editorFontSize) as? Double {
+            editorFontSize = clampedEditorFontSize(CGFloat(storedEditorFontSize))
         }
 
         activeScene = .emptyState
@@ -772,6 +791,17 @@ final class WorkspaceStore: ObservableObject {
             gitBranch: "main",
             lspOnline: true
         )
+    }
+
+    private func setEditorFontSize(_ fontSize: CGFloat) {
+        let clamped = clampedEditorFontSize(fontSize)
+        guard clamped != editorFontSize else { return }
+        editorFontSize = clamped
+        persistState()
+    }
+
+    private func clampedEditorFontSize(_ fontSize: CGFloat) -> CGFloat {
+        min(max(fontSize, minEditorFontSize), maxEditorFontSize)
     }
 
     private func commandItems() -> [CommandItem] {

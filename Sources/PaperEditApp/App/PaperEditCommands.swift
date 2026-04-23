@@ -58,6 +58,20 @@ struct PaperEditCommands: Commands {
                 workspaceStore.toggleTheme()
             }
             .keyboardShortcut("t", modifiers: [.command, .option])
+
+            Divider()
+
+            Button("Increase Font Size") {
+                workspaceStore.increaseEditorFontSize()
+            }
+            .keyboardShortcut("+", modifiers: [.command])
+            .disabled(workspaceStore.activeTab == nil)
+
+            Button("Decrease Font Size") {
+                workspaceStore.decreaseEditorFontSize()
+            }
+            .keyboardShortcut("-", modifiers: [.command])
+            .disabled(workspaceStore.activeTab == nil)
         }
 
         CommandGroup(replacing: .appSettings) {

@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 struct MarkdownPreviewContainer: View {
+    @EnvironmentObject private var workspaceStore: WorkspaceStore
     let tab: EditorTab
     let theme: PaperTheme
     let isDark: Bool
@@ -107,6 +108,7 @@ struct MarkdownPreviewContainer: View {
             text: tab.text,
             language: .markdown,
             selection: tab.selection,
+            fontSize: workspaceStore.editorFontSize,
             showLineNumbers: true,
             showsFolding: false,
             theme: theme,

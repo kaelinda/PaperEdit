@@ -44,6 +44,32 @@ import Testing
 }
 
 @MainActor
+@Test func editorFontSizeClampsAndPersists() {
+    let suiteName = "PaperEditTests-\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+        Issue.record("Expected isolated defaults suite")
+        return
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let store = WorkspaceStore(defaults: defaults)
+
+    for _ in 0..<32 {
+        store.increaseEditorFontSize()
+    }
+    #expect(store.editorFontSize == 24)
+
+    for _ in 0..<32 {
+        store.decreaseEditorFontSize()
+    }
+    #expect(store.editorFontSize == 11)
+
+    let restored = WorkspaceStore(defaults: defaults)
+    #expect(restored.editorFontSize == 11)
+}
+
+@MainActor
 @Test func opensExternalFilesAsTabs() throws {
     let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)

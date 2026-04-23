@@ -5,6 +5,7 @@ struct CodeEditorView: View {
     var text: String
     var language: EditorFileFormat
     var selection: NSRange
+    var fontSize: CGFloat
     var showLineNumbers: Bool
     var showsFolding: Bool
     var theme: PaperTheme
@@ -19,6 +20,7 @@ struct CodeEditorView: View {
             text: text,
             language: language,
             selection: selection,
+            fontSize: fontSize,
             showLineNumbers: showLineNumbers,
             theme: theme,
             isDark: isDark,
@@ -34,6 +36,7 @@ private struct NativeCodeTextView: NSViewRepresentable {
     var text: String
     var language: EditorFileFormat
     var selection: NSRange
+    var fontSize: CGFloat
     var showLineNumbers: Bool
     var theme: PaperTheme
     var isDark: Bool
@@ -49,7 +52,7 @@ private struct NativeCodeTextView: NSViewRepresentable {
         view.textView.delegate = context.coordinator
         context.coordinator.containerView = view
         context.coordinator.applyExternalUpdate = true
-        view.update(text: text, selection: selection, language: language, showLineNumbers: showLineNumbers, theme: theme, isDark: isDark)
+        view.update(text: text, selection: selection, language: language, fontSize: fontSize, showLineNumbers: showLineNumbers, theme: theme, isDark: isDark)
         context.coordinator.applyExternalUpdate = false
         return view
     }
@@ -58,7 +61,7 @@ private struct NativeCodeTextView: NSViewRepresentable {
         context.coordinator.parent = self
         context.coordinator.containerView = nsView
         context.coordinator.applyExternalUpdate = true
-        nsView.update(text: text, selection: selection, language: language, showLineNumbers: showLineNumbers, theme: theme, isDark: isDark)
+        nsView.update(text: text, selection: selection, language: language, fontSize: fontSize, showLineNumbers: showLineNumbers, theme: theme, isDark: isDark)
         context.coordinator.applyExternalUpdate = false
     }
 
@@ -86,10 +89,10 @@ private struct NativeCodeTextView: NSViewRepresentable {
 }
 
 private final class EditorTextContainerView: NSView {
-    let textView = NSTextView()
+    let textView: NSTextView
 
     private let gutterScrollView = NSScrollView()
-    private let gutterTextView = NSTextView()
+    private let gutterTextView: NSTextView
     private let editorScrollView = NSScrollView()
     private let stackView = NSStackView()
     private let gutterWidthConstraint: NSLayoutConstraint
@@ -97,8 +100,11 @@ private final class EditorTextContainerView: NSView {
     private var currentTheme: PaperTheme?
     private var currentLanguage: EditorFileFormat = .plainText
     private var currentIsDark = false
+    private var currentFontSize = WorkspaceStore.defaultEditorFontSize
 
     init(showLineNumbers: Bool) {
+        textView = Self.makeEditorTextView()
+        gutterTextView = Self.makeGutterTextView()
         gutterWidthConstraint = gutterScrollView.widthAnchor.constraint(equalToConstant: showLineNumbers ? 48 : 0)
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
@@ -124,14 +130,11 @@ private final class EditorTextContainerView: NSView {
         text: String,
         selection: NSRange,
         language: EditorFileFormat,
+        fontSize: CGFloat,
         showLineNumbers: Bool,
         theme: PaperTheme,
         isDark: Bool
     ) {
-        currentLanguage = language
-        currentTheme = theme
-        currentIsDark = isDark
-
         let editorBackground = NSColor(theme.editorBackground)
         let gutterBackground = NSColor(theme.editorBackground)
         layer?.backgroundColor = editorBackground.cgColor
@@ -146,19 +149,26 @@ private final class EditorTextContainerView: NSView {
         let needsHighlightRefresh = textView.string != text
             || currentLanguage != language
             || currentIsDark != isDark
+            || currentFontSize != fontSize
+
+        currentLanguage = language
+        currentTheme = theme
+        currentIsDark = isDark
+        currentFontSize = fontSize
 
         if needsHighlightRefresh {
             let highlighted = SyntaxHighlighter.highlightedText(
                 for: text,
                 language: language,
                 theme: theme,
-                isDark: isDark
+                isDark: isDark,
+                fontSize: fontSize
             )
             textView.textStorage?.setAttributedString(highlighted)
-            textView.typingAttributes = SyntaxHighlighter.baseAttributes(theme: theme)
+            textView.typingAttributes = SyntaxHighlighter.baseAttributes(theme: theme, fontSize: fontSize)
             refreshLineNumbers()
         } else if textView.typingAttributes[.foregroundColor] == nil {
-            textView.typingAttributes = SyntaxHighlighter.baseAttributes(theme: theme)
+            textView.typingAttributes = SyntaxHighlighter.baseAttributes(theme: theme, fontSize: fontSize)
         }
 
         if textView.selectedRange() != selection {
@@ -177,7 +187,7 @@ private final class EditorTextContainerView: NSView {
             NSAttributedString(
                 string: lineNumbers,
                 attributes: [
-                    .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .medium),
+                    .font: NSFont.monospacedSystemFont(ofSize: max(11, currentFontSize - 2), weight: .medium),
                     .foregroundColor: NSColor(currentTheme?.textSubtle ?? Color(nsColor: .secondaryLabelColor)),
                     .paragraphStyle: paragraphStyle,
                 ]
@@ -194,10 +204,11 @@ private final class EditorTextContainerView: NSView {
             for: textView.string,
             language: language,
             theme: theme,
-            isDark: isDark
+            isDark: isDark,
+            fontSize: currentFontSize
         )
         textView.textStorage?.setAttributedString(highlighted)
-        textView.typingAttributes = SyntaxHighlighter.baseAttributes(theme: theme)
+        textView.typingAttributes = SyntaxHighlighter.baseAttributes(theme: theme, fontSize: currentFontSize)
         textView.setSelectedRange(selection)
     }
 
@@ -220,9 +231,6 @@ private final class EditorTextContainerView: NSView {
     }
 
     private func configureEditor() {
-        let textContainer = NSTextContainer(size: NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude))
-        textContainer.widthTracksTextView = false
-        textView.textContainer = textContainer
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.isVerticallyResizable = true
@@ -235,7 +243,7 @@ private final class EditorTextContainerView: NSView {
         textView.isAutomaticTextReplacementEnabled = false
         textView.isAutomaticSpellingCorrectionEnabled = false
         textView.isGrammarCheckingEnabled = false
-        textView.font = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+        textView.font = NSFont.monospacedSystemFont(ofSize: WorkspaceStore.defaultEditorFontSize, weight: .regular)
         textView.allowsUndo = true
         textView.isRichText = false
         textView.importsGraphics = false
@@ -250,15 +258,12 @@ private final class EditorTextContainerView: NSView {
     }
 
     private func configureGutter() {
-        let gutterContainer = NSTextContainer(size: NSSize(width: 48, height: CGFloat.greatestFiniteMagnitude))
-        gutterContainer.widthTracksTextView = true
-        gutterTextView.textContainer = gutterContainer
         gutterTextView.isEditable = false
         gutterTextView.isSelectable = false
         gutterTextView.drawsBackground = true
         gutterTextView.textContainerInset = NSSize(width: 0, height: 16)
         gutterTextView.textContainer?.lineFragmentPadding = 0
-        gutterTextView.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .medium)
+        gutterTextView.font = NSFont.monospacedSystemFont(ofSize: max(11, WorkspaceStore.defaultEditorFontSize - 2), weight: .medium)
 
         gutterScrollView.drawsBackground = true
         gutterScrollView.hasVerticalScroller = false
@@ -293,6 +298,26 @@ private final class EditorTextContainerView: NSView {
         gutterScrollView.contentView.scroll(to: NSPoint(x: 0, y: origin.y))
         gutterScrollView.reflectScrolledClipView(gutterScrollView.contentView)
     }
+
+    private static func makeEditorTextView() -> NSTextView {
+        let textStorage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        let textContainer = NSTextContainer(size: NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude))
+        textContainer.widthTracksTextView = false
+        textStorage.addLayoutManager(layoutManager)
+        layoutManager.addTextContainer(textContainer)
+        return NSTextView(frame: .zero, textContainer: textContainer)
+    }
+
+    private static func makeGutterTextView() -> NSTextView {
+        let textStorage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        let textContainer = NSTextContainer(size: NSSize(width: 48, height: CGFloat.greatestFiniteMagnitude))
+        textContainer.widthTracksTextView = true
+        textStorage.addLayoutManager(layoutManager)
+        layoutManager.addTextContainer(textContainer)
+        return NSTextView(frame: .zero, textContainer: textContainer)
+    }
 }
 
 private enum SyntaxHighlighter {
@@ -307,21 +332,22 @@ private enum SyntaxHighlighter {
         for text: String,
         language: EditorFileFormat,
         theme: PaperTheme,
-        isDark: Bool
+        isDark: Bool,
+        fontSize: CGFloat
     ) -> NSAttributedString {
-        let attributed = NSMutableAttributedString(string: text, attributes: baseAttributes(theme: theme))
+        let attributed = NSMutableAttributedString(string: text, attributes: baseAttributes(theme: theme, fontSize: fontSize))
 
         guard language == .shellScript else {
             return attributed
         }
 
-        highlightShell(in: attributed, theme: theme, isDark: isDark)
+        highlightShell(in: attributed, theme: theme, isDark: isDark, fontSize: fontSize)
         return attributed
     }
 
-    static func baseAttributes(theme: PaperTheme) -> [NSAttributedString.Key: Any] {
+    static func baseAttributes(theme: PaperTheme, fontSize: CGFloat) -> [NSAttributedString.Key: Any] {
         [
-            .font: NSFont.monospacedSystemFont(ofSize: 14, weight: .regular),
+            .font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular),
             .foregroundColor: NSColor(theme.textPrimary),
         ]
     }
@@ -329,7 +355,8 @@ private enum SyntaxHighlighter {
     private static func highlightShell(
         in attributed: NSMutableAttributedString,
         theme: PaperTheme,
-        isDark: Bool
+        isDark: Bool,
+        fontSize: CGFloat
     ) {
         let string = attributed.string
         let nsString = string as NSString
@@ -349,7 +376,8 @@ private enum SyntaxHighlighter {
                 stringColor: stringColor,
                 commentColor: commentColor,
                 variableColor: variableColor,
-                shebangColor: shebangColor
+                shebangColor: shebangColor,
+                fontSize: fontSize
             )
         }
     }
@@ -362,7 +390,8 @@ private enum SyntaxHighlighter {
         stringColor: NSColor,
         commentColor: NSColor,
         variableColor: NSColor,
-        shebangColor: NSColor
+        shebangColor: NSColor,
+        fontSize: CGFloat
     ) {
         guard lineRange.location != NSNotFound else { return }
         let line = fullText.substring(with: lineRange)
@@ -443,7 +472,7 @@ private enum SyntaxHighlighter {
                 if shellKeywords.contains(token) {
                     let range = NSRange(location: lineRange.location + start, length: token.count)
                     attributed.addAttribute(.foregroundColor, value: keywordColor, range: range)
-                    attributed.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 14, weight: .semibold), range: range)
+                    attributed.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold), range: range)
                 }
                 continue
             }

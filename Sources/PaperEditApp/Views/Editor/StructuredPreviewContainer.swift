@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 struct StructuredPreviewContainer: View {
+    @EnvironmentObject private var workspaceStore: WorkspaceStore
     let tab: EditorTab
     let theme: PaperTheme
     let isDark: Bool
@@ -92,6 +93,7 @@ struct StructuredPreviewContainer: View {
             text: tab.text,
             language: tab.format,
             selection: tab.selection,
+            fontSize: workspaceStore.editorFontSize,
             showLineNumbers: true,
             showsFolding: tab.showsFolding,
             theme: theme,
@@ -217,17 +219,24 @@ private struct StructuredPreviewNodeRow: View {
     let theme: PaperTheme
     @State private var isExpanded = true
 
+    private let expansionAnimation = Animation.spring(response: 0.28, dampingFraction: 0.82, blendDuration: 0.12)
+
     private var hasChildren: Bool {
         !node.children.isEmpty
+    }
+
+    private func toggleExpansion() {
+        guard hasChildren else { return }
+        withAnimation(expansionAnimation) {
+            isExpanded.toggle()
+        }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Button {
-                    if hasChildren {
-                        isExpanded.toggle()
-                    }
+                    toggleExpansion()
                 } label: {
                     Image(systemName: hasChildren ? "chevron.right" : "circle.fill")
                         .font(.system(size: hasChildren ? 10 : 4, weight: .bold))
@@ -261,6 +270,7 @@ private struct StructuredPreviewNodeRow: View {
             .padding(.vertical, 7)
             .padding(.horizontal, 10)
             .padding(.leading, CGFloat(depth) * 18)
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(depth == 0 ? theme.secondaryElevatedBackground : theme.hover.opacity(0.45))
@@ -269,11 +279,26 @@ private struct StructuredPreviewNodeRow: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(depth == 0 ? theme.border : .clear, lineWidth: 1)
             )
+            .onTapGesture {
+                toggleExpansion()
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(hasChildren ? .isButton : [])
+            .accessibilityValue(hasChildren ? (isExpanded ? "Expanded" : "Collapsed") : "")
+            .animation(expansionAnimation, value: isExpanded)
 
             if isExpanded {
-                ForEach(node.children) { child in
-                    StructuredPreviewNodeRow(node: child, depth: depth + 1, theme: theme)
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(node.children) { child in
+                        StructuredPreviewNodeRow(node: child, depth: depth + 1, theme: theme)
+                    }
                 }
+                .transition(
+                    .asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.985, anchor: .top)),
+                        removal: .opacity.combined(with: .scale(scale: 0.985, anchor: .top))
+                    )
+                )
             }
         }
     }
