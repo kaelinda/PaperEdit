@@ -89,6 +89,34 @@ import Testing
 }
 
 @MainActor
+@Test func openingExternalDirectorySetsWorkspaceWithoutCreatingTab() throws {
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let store = WorkspaceStore()
+    store.openExternalFiles([tempDirectory])
+
+    #expect(store.workspaceRootURL == tempDirectory)
+    #expect(store.expandedNodeIDs.contains(tempDirectory.path))
+    #expect(store.openTabs.isEmpty)
+}
+
+@Test func commandLineOpenRequestResolvesRelativeAndAbsolutePaths() {
+    let currentDirectoryURL = URL(fileURLWithPath: "/tmp/paper-project")
+
+    let urls = CommandLineOpenRequest.urls(
+        from: ["draft.json", "/tmp/absolute.yaml", "--ignored"],
+        currentDirectoryURL: currentDirectoryURL
+    )
+
+    #expect(urls.map(\.path) == [
+        "/tmp/paper-project/draft.json",
+        "/tmp/absolute.yaml",
+    ])
+}
+
+@MainActor
 @Test func reusesExistingTabForSameExternalFile() throws {
     let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)

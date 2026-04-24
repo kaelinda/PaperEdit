@@ -9,10 +9,14 @@ let package = Package(
     ],
     products: [
         .executable(name: "PaperEditApp", targets: ["PaperEditApp"]),
+        .executable(name: "paper", targets: ["paper"]),
     ],
     targets: [
         .executableTarget(
             name: "PaperEditApp"
+        ),
+        .executableTarget(
+            name: "paper"
         ),
         .testTarget(
             name: "PaperEditAppTests",

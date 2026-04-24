@@ -191,6 +191,11 @@ final class WorkspaceStore: ObservableObject {
 
     func openExternalFiles(_ urls: [URL]) {
         for url in urls {
+            if isDirectory(url) {
+                openExternalDirectory(url)
+                continue
+            }
+
             if let existing = openTabs.first(where: { isSameFileURL($0.sourceURL, url) }) {
                 activeTabID = existing.id
                 continue
@@ -220,6 +225,11 @@ final class WorkspaceStore: ObservableObject {
         }
         persistState()
         refreshStatus()
+    }
+
+    private func openExternalDirectory(_ url: URL) {
+        workspaceRootURL = url
+        expandedNodeIDs.insert(url.path)
     }
 
     func presentOpenPanel() {
@@ -631,6 +641,11 @@ final class WorkspaceStore: ObservableObject {
     private func isSameFileURL(_ lhs: URL?, _ rhs: URL) -> Bool {
         guard let lhs else { return false }
         return normalizedFilePath(for: lhs) == normalizedFilePath(for: rhs)
+    }
+
+    private func isDirectory(_ url: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 
     private func normalizedFilePath(for url: URL) -> String {

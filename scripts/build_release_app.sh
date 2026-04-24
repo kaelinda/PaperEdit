@@ -16,12 +16,14 @@ MASTER_ICON="$ROOT_DIR/Assets/AppIcon.png"
 MASTER_PNG="$BUILD_DIR/AppIcon-1024.png"
 ICNS_PATH="$RESOURCES_DIR/AppIcon.icns"
 RELEASE_EXECUTABLE="$ROOT_DIR/.build/release/$EXECUTABLE_NAME"
+CLI_EXECUTABLE="$ROOT_DIR/.build/release/paper"
 ZIP_PATH="$BUILD_DIR/$APP_NAME-$VERSION-macOS.zip"
 
 mkdir -p "$BUILD_DIR"
 rm -rf "$APP_DIR" "$ICONSET_DIR"
 
-swift build -c release --package-path "$ROOT_DIR"
+swift build -c release --package-path "$ROOT_DIR" --product "$EXECUTABLE_NAME"
+swift build -c release --package-path "$ROOT_DIR" --product paper
 
 mkdir -p "$ICONSET_DIR"
 sips -z 1024 1024 "$MASTER_ICON" --out "$MASTER_PNG" >/dev/null
@@ -47,6 +49,8 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 iconutil -c icns "$ICONSET_DIR" -o "$ICNS_PATH"
 cp "$RELEASE_EXECUTABLE" "$MACOS_DIR/$APP_NAME"
 chmod +x "$MACOS_DIR/$APP_NAME"
+cp "$CLI_EXECUTABLE" "$BUILD_DIR/paper"
+chmod +x "$BUILD_DIR/paper"
 
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -89,4 +93,5 @@ codesign --force --deep --sign - "$APP_DIR" >/dev/null
 ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$ZIP_PATH"
 
 echo "Built app bundle: $APP_DIR"
+echo "Built CLI: $BUILD_DIR/paper"
 echo "Built archive: $ZIP_PATH"

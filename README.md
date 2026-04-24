@@ -43,6 +43,17 @@ swift run PaperEditApp
 swift build
 ```
 
+## 命令行打开
+
+发布脚本会同时生成 `dist/paper` 命令行入口。把它放到 PATH 后，可以直接打开文件或目录：
+
+```bash
+paper x.json
+paper ~/Documents/notes
+```
+
+文件会作为标签页打开，目录会作为工作区显示在侧边栏。`paper` 会优先打开同目录下的 `PaperEdit.app`，也可以通过 `PAPEREDIT_APP_PATH=/path/to/PaperEdit.app paper x.json` 指定应用位置。
+
 ## 测试
 
 运行全部测试：
@@ -64,6 +75,7 @@ swift test
 生成结果位于 `dist/`：
 
 - `dist/PaperEdit.app`
+- `dist/paper`
 - `dist/PaperEdit-0.1.3-macOS.zip`
 
 发布脚本依赖 `Assets/AppIcon.png` 生成 `.icns` 图标文件。
