@@ -9,14 +9,21 @@ final class WorkspaceStore: ObservableObject {
         static let recentFiles = "paperedit.recent-files"
         static let workspaceRoot = "paperedit.workspace-root"
         static let editorFontSize = "paperedit.editor-font-size"
+        static let themeMode = "paperedit.theme-mode"
+        static let sidebarMaterialStyle = "paperedit.sidebar-material-style"
+        static let accentSwatch = "paperedit.accent-swatch"
     }
 
     static let defaultEditorFontSize: CGFloat = 14
+    static let defaultSidebarWidth: CGFloat = 240
+    static let defaultThemeMode: ThemePalette = .light
+    static let defaultSidebarMaterialStyle: SidebarMaterialStyle = .translucent
+    static let defaultAccentSwatch: AccentSwatch = .blue
 
     @Published var openTabs: [EditorTab] = []
     @Published var activeTabID: EditorTab.ID?
-    @Published var sidebarWidth: CGFloat = 240
-    @Published var themeMode: ThemePalette = .light
+    @Published var sidebarWidth: CGFloat = WorkspaceStore.defaultSidebarWidth
+    @Published var themeMode: ThemePalette = WorkspaceStore.defaultThemeMode
     @Published var viewMode: EditorViewMode = .split
     @Published var showCommandPalette = false
     @Published var showQuickOpen = false
@@ -25,8 +32,8 @@ final class WorkspaceStore: ObservableObject {
     @Published var activeScene: DemoScene = .lightMarkdownSplit
     @Published var status = EditorStatus.empty
     @Published var editorFontSize: CGFloat = WorkspaceStore.defaultEditorFontSize
-    @Published var sidebarMaterialStyle: SidebarMaterialStyle = .translucent
-    @Published var accentSwatch: AccentSwatch = .blue
+    @Published var sidebarMaterialStyle: SidebarMaterialStyle = WorkspaceStore.defaultSidebarMaterialStyle
+    @Published var accentSwatch: AccentSwatch = WorkspaceStore.defaultAccentSwatch
     @Published var sidebarSections: Set<SidebarSection> = Set(SidebarSection.allCases)
     @Published var expandedNodeIDs: Set<String> = []
     @Published var workspaceRootURL: URL? {
@@ -366,6 +373,24 @@ final class WorkspaceStore: ObservableObject {
         viewMode = mode
     }
 
+    func setThemeMode(_ mode: ThemePalette) {
+        guard themeMode != mode else { return }
+        themeMode = mode
+        persistState()
+    }
+
+    func setSidebarMaterialStyle(_ style: SidebarMaterialStyle) {
+        guard sidebarMaterialStyle != style else { return }
+        sidebarMaterialStyle = style
+        persistState()
+    }
+
+    func setAccentSwatch(_ swatch: AccentSwatch) {
+        guard accentSwatch != swatch else { return }
+        accentSwatch = swatch
+        persistState()
+    }
+
     func toggleTheme() {
         switch themeMode {
         case .light, .system:
@@ -382,6 +407,15 @@ final class WorkspaceStore: ObservableObject {
 
     func decreaseEditorFontSize() {
         setEditorFontSize(editorFontSize - 1)
+    }
+
+    func resetInterfacePreferences() {
+        themeMode = WorkspaceStore.defaultThemeMode
+        sidebarMaterialStyle = WorkspaceStore.defaultSidebarMaterialStyle
+        accentSwatch = WorkspaceStore.defaultAccentSwatch
+        editorFontSize = WorkspaceStore.defaultEditorFontSize
+        sidebarWidth = WorkspaceStore.defaultSidebarWidth
+        persistState()
     }
 
     @discardableResult
@@ -693,6 +727,9 @@ final class WorkspaceStore: ObservableObject {
         defaults.set(recentFileURLs.map(\.path), forKey: StorageKey.recentFiles)
         defaults.set(workspaceRootURL?.path, forKey: StorageKey.workspaceRoot)
         defaults.set(Double(editorFontSize), forKey: StorageKey.editorFontSize)
+        defaults.set(themeMode.rawValue, forKey: StorageKey.themeMode)
+        defaults.set(sidebarMaterialStyle.rawValue, forKey: StorageKey.sidebarMaterialStyle)
+        defaults.set(accentSwatch.rawValue, forKey: StorageKey.accentSwatch)
     }
 
     private func restorePersistentState() {
@@ -713,6 +750,18 @@ final class WorkspaceStore: ObservableObject {
 
         if let storedEditorFontSize = defaults.object(forKey: StorageKey.editorFontSize) as? Double {
             editorFontSize = clampedEditorFontSize(CGFloat(storedEditorFontSize))
+        }
+        if let storedThemeMode = defaults.string(forKey: StorageKey.themeMode),
+           let restoredThemeMode = ThemePalette(rawValue: storedThemeMode) {
+            themeMode = restoredThemeMode
+        }
+        if let storedSidebarMaterialStyle = defaults.string(forKey: StorageKey.sidebarMaterialStyle),
+           let restoredSidebarMaterialStyle = SidebarMaterialStyle(rawValue: storedSidebarMaterialStyle) {
+            sidebarMaterialStyle = restoredSidebarMaterialStyle
+        }
+        if let storedAccentSwatch = defaults.string(forKey: StorageKey.accentSwatch),
+           let restoredAccentSwatch = AccentSwatch(rawValue: storedAccentSwatch) {
+            accentSwatch = restoredAccentSwatch
         }
 
         activeScene = .emptyState
@@ -845,7 +894,7 @@ final class WorkspaceStore: ObservableObject {
         )
     }
 
-    private func setEditorFontSize(_ fontSize: CGFloat) {
+    func setEditorFontSize(_ fontSize: CGFloat) {
         let clamped = clampedEditorFontSize(fontSize)
         guard clamped != editorFontSize else { return }
         editorFontSize = clamped

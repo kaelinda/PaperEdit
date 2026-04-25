@@ -79,11 +79,16 @@ nav {
   align-items: center;
   display: flex;
   gap: 28px;
+  min-width: 0;
 }
 
 nav a {
+  align-items: center;
   color: var(--ink-soft);
+  display: inline-flex;
   font-size: 13px;
+  min-height: 44px;
+  white-space: nowrap;
   transition: color 160ms ease;
 }
 
@@ -100,6 +105,7 @@ nav a:hover,
   color: var(--ink-soft);
   cursor: pointer;
   font: 650 12px var(--mono);
+  min-height: 44px;
   min-width: 48px;
   padding: 7px 12px;
   transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
@@ -142,7 +148,7 @@ p {
 
 h1 {
   font-family: var(--serif);
-  font-size: clamp(48px, 7vw, 92px);
+  font-size: clamp(38px, 7vw, 92px);
   font-weight: 540;
   line-height: 0.96;
   margin: 16px auto 24px;
@@ -204,6 +210,8 @@ h1 {
   display: inline-flex;
   gap: 4px;
   margin-bottom: 18px;
+  max-width: 100%;
+  overflow-x: auto;
   padding: 4px;
 }
 
@@ -215,7 +223,9 @@ h1 {
   color: var(--ink-soft);
   cursor: pointer;
   font: 650 13px var(--sans);
+  min-height: 40px;
   padding: 8px 18px;
+  white-space: nowrap;
 }
 
 .mode-switch button.active {
@@ -289,6 +299,19 @@ h1 {
   padding: 0 10px;
 }
 
+.side-row span,
+.tree-row,
+.titlebar strong,
+.titlebar span,
+.tabs span,
+.result strong,
+.result span,
+.command span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .side-row.active {
   background: var(--accent-soft);
   color: var(--ink);
@@ -319,6 +342,10 @@ h1 {
   padding: 0 18px 0 28px;
 }
 
+.titlebar > div:first-child {
+  min-width: 0;
+}
+
 .titlebar strong {
   display: block;
   font-size: 15px;
@@ -347,8 +374,13 @@ h1 {
   display: flex;
   gap: 4px;
   min-height: 42px;
-  overflow: hidden;
+  overflow-x: auto;
+  scrollbar-width: none;
   padding: 6px 12px 0;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tabs span {
@@ -356,6 +388,7 @@ h1 {
   color: var(--ink-muted);
   font-size: 13px;
   padding: 10px 16px;
+  flex: 0 0 auto;
   white-space: nowrap;
 }
 
@@ -630,11 +663,18 @@ footer span:first-child {
 
 @media (max-width: 900px) {
   .site-header {
+    gap: 18px;
     padding-inline: 20px;
   }
 
   nav {
     gap: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  nav::-webkit-scrollbar {
+    display: none;
   }
 
   .hero {
@@ -647,11 +687,30 @@ footer span:first-child {
 
   .app-window {
     grid-template-columns: 1fr;
-    min-height: 560px;
+    min-height: 0;
   }
 
   .sidebar {
-    display: none;
+    border-bottom: 1px solid var(--rule);
+    border-right: 0;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 18px;
+  }
+
+  .sidebar-group {
+    margin-bottom: 0;
+    min-width: 0;
+  }
+
+  .sidebar-group p {
+    margin-inline: 2px;
+  }
+
+  .side-row,
+  .tree-row {
+    min-height: 40px;
   }
 
   .title-actions {
@@ -679,12 +738,43 @@ footer span:first-child {
 }
 
 @media (max-width: 560px) {
+  .site-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-block: 18px 12px;
+  }
+
+  nav {
+    width: 100%;
+  }
+
   nav a {
-    display: none;
+    display: inline-flex;
   }
 
   h1 {
-    font-size: 47px;
+    font-size: clamp(34px, 11vw, 47px);
+    line-height: 1.02;
+  }
+
+  .hero {
+    padding-bottom: 54px;
+    text-align: left;
+  }
+
+  .hero-copy,
+  h1 {
+    margin-inline: 0;
+  }
+
+  .mode-switch {
+    display: flex;
+    width: 100%;
+  }
+
+  .mode-switch button {
+    flex: 1 1 0;
+    padding-inline: 12px;
   }
 
   .hero-actions,
@@ -701,8 +791,20 @@ footer span:first-child {
     border-radius: 18px;
   }
 
-  .tabs span:nth-child(n + 3) {
-    display: none;
+  .sidebar {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .titlebar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 16px;
+  }
+
+  .tabs {
+    padding-inline: 8px;
   }
 
   .editor-preview {
@@ -726,9 +828,65 @@ footer span:first-child {
     font-size: 12px;
   }
 
+  .feature-copy h2,
+  .download-section h2 {
+    font-size: clamp(31px, 10vw, 42px);
+  }
+
+  .panel {
+    min-height: 0;
+  }
+
+  .quick-open-panel,
+  .command-panel,
+  .format-panel {
+    padding: 16px;
+  }
+
   footer {
     align-items: flex-start;
     flex-direction: column;
     gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .grain,
+  .site-header,
+  .mode-switch,
+  .hero-actions,
+  .download-actions {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #111;
+  }
+
+  .hero,
+  .feature-row,
+  .download-section,
+  footer {
+    max-width: none;
+    padding: 24px 0;
+  }
+
+  .app-window,
+  .panel {
+    box-shadow: none;
+    break-inside: avoid;
   }
 }

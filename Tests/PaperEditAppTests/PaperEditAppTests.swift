@@ -70,6 +70,36 @@ import Testing
 }
 
 @MainActor
+@Test func interfacePreferencesPersistAndReset() {
+    let suiteName = "PaperEditTests-\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+        Issue.record("Expected isolated defaults suite")
+        return
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let store = WorkspaceStore(defaults: defaults)
+    store.setThemeMode(.dark)
+    store.setSidebarMaterialStyle(.opaque)
+    store.setAccentSwatch(.purple)
+    store.setEditorFontSize(20)
+
+    let restored = WorkspaceStore(defaults: defaults)
+    #expect(restored.themeMode == .dark)
+    #expect(restored.sidebarMaterialStyle == .opaque)
+    #expect(restored.accentSwatch == .purple)
+    #expect(restored.editorFontSize == 20)
+
+    restored.resetInterfacePreferences()
+    let reset = WorkspaceStore(defaults: defaults)
+    #expect(reset.themeMode == WorkspaceStore.defaultThemeMode)
+    #expect(reset.sidebarMaterialStyle == WorkspaceStore.defaultSidebarMaterialStyle)
+    #expect(reset.accentSwatch == WorkspaceStore.defaultAccentSwatch)
+    #expect(reset.editorFontSize == WorkspaceStore.defaultEditorFontSize)
+}
+
+@MainActor
 @Test func opensExternalFilesAsTabs() throws {
     let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)

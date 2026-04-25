@@ -34,6 +34,7 @@ struct CommandPaletteView: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 14, weight: .medium))
                         .focused($queryFocused)
+                        .accessibilityLabel("Search commands or files")
                         .onSubmit {
                             guard items.indices.contains(workspaceStore.commandPaletteModel.selectedIndex) else { return }
                             workspaceStore.executeCommand(items[workspaceStore.commandPaletteModel.selectedIndex], settingsModel: settingsModel)
@@ -145,31 +146,33 @@ private struct CommandPaletteRow: View {
             HStack(spacing: 12) {
                 Image(systemName: item.symbolName)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(isSelected ? theme.accentForeground : theme.textMuted)
+                    .foregroundStyle(isSelected ? theme.accent : theme.textMuted)
                     .frame(width: 18)
 
                 Text(item.title)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(isSelected ? theme.accentForeground : theme.textPrimary)
+                    .foregroundStyle(theme.textPrimary)
                     .lineLimit(1)
+                    .truncationMode(.tail)
 
                 Spacer(minLength: 10)
 
                 if showsCategory {
                     Text(item.category)
                         .font(.system(size: 12))
-                        .foregroundStyle(isSelected ? theme.accentForeground.opacity(0.82) : theme.textMuted)
+                        .foregroundStyle(theme.textMuted)
+                        .lineLimit(1)
                 }
 
                 if let shortcut = item.shortcut {
                     Text(shortcut)
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(isSelected ? theme.accentForeground.opacity(0.92) : theme.textMuted)
+                        .foregroundStyle(isSelected ? theme.accent : theme.textMuted)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(isSelected ? theme.accentForeground.opacity(0.14) : theme.hover)
+                                .fill(isSelected ? theme.accent.opacity(0.14) : theme.hover)
                         )
                 }
             }
@@ -186,5 +189,8 @@ private struct CommandPaletteRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.title), \(item.category)")
+        .accessibilityValue(isSelected ? "Selected" : "")
     }
 }

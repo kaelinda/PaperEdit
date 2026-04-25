@@ -41,7 +41,7 @@ private extension WorkspaceStore {
     SettingsRootView()
         .environmentObject(WorkspaceStore.preview(scene: .lightMarkdownSplit))
         .environmentObject(SettingsWindowModel())
-        .frame(width: 560, height: 380)
+        .frame(width: 560, height: 480)
 }
 
 #Preview("6. Command Palette") {

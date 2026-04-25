@@ -140,7 +140,7 @@ extension AccentSwatch {
     var foregroundColor: Color {
         switch self {
         case .orange, .green:
-            Color.white
+            Color(hex: "#111214")
         case .blue, .red, .purple:
             Color.white
         }

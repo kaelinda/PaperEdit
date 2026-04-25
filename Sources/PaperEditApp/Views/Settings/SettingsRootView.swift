@@ -47,8 +47,11 @@ struct SettingsRootView: View {
             }
 
             HStack {
-                Button("Restore Defaults") {}
+                Button("Restore Defaults") {
+                    workspaceStore.resetInterfacePreferences()
+                }
                     .buttonStyle(.bordered)
+                    .help("Restore appearance and editor preferences")
 
                 Spacer()
 
@@ -102,26 +105,20 @@ struct SettingsRootView: View {
             }
         case .editor:
             settingsCard("Text") {
-                valueStepperRow("Font size", value: "14")
-                valueStepperRow("Line height", value: "1.6")
+                fontSizeStepperRow
+                labeledValueRow("Line height", value: "Automatic")
             }
 
             settingsCard("Code Editing") {
-                toggleRow("Show line numbers", true)
-                toggleRow("Highlight current line", true)
-                toggleRow("Word wrap", false)
-                valueStepperRow("Tab width", value: "4")
-            }
-
-            settingsCard("Behavior") {
-                toggleRow("Auto closing brackets", true)
-                toggleRow("Auto indentation", true)
+                labeledValueRow("Line numbers", value: "Always on")
+                labeledValueRow("Current line", value: "Highlighted")
+                labeledValueRow("Word wrap", value: "Off")
             }
         case .appearance:
             settingsCard("Theme") {
-                labeledPickerRow("Color Theme", selection: $workspaceStore.themeMode, values: ThemePalette.allCases)
+                labeledPickerRow("Color Theme", selection: themeModeBinding, values: ThemePalette.allCases)
                 accentRow
-                labeledPickerRow("Sidebar Material", selection: $workspaceStore.sidebarMaterialStyle, values: SidebarMaterialStyle.allCases)
+                labeledPickerRow("Sidebar Material", selection: sidebarMaterialStyleBinding, values: SidebarMaterialStyle.allCases)
             }
         case .shortcuts:
             settingsCard("Core Shortcuts") {
@@ -138,6 +135,8 @@ struct SettingsRootView: View {
             Text(title)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(theme.textMuted)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
             VStack(spacing: 0) {
                 content()
@@ -154,41 +153,33 @@ struct SettingsRootView: View {
         settingsRow {
             Text(title)
                 .foregroundStyle(theme.textPrimary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer()
             Text(value)
                 .foregroundStyle(theme.textMuted)
+                .lineLimit(2)
+                .multilineTextAlignment(.trailing)
         }
     }
 
-    private func valueStepperRow(_ title: String, value: String) -> some View {
+    private var fontSizeStepperRow: some View {
         settingsRow {
-            Text(title)
+            Text("Font size")
                 .foregroundStyle(theme.textPrimary)
+                .lineLimit(2)
             Spacer()
-            HStack(spacing: 10) {
-                Text(value)
+            Stepper(
+                value: editorFontSizeBinding,
+                in: 11.0...24.0,
+                step: 1
+            ) {
+                Text("\(Int(workspaceStore.editorFontSize)) pt")
                     .foregroundStyle(theme.textPrimary)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(theme.textSubtle)
+                    .monospacedDigit()
             }
-            .padding(.horizontal, 10)
-            .frame(height: 28)
-            .background(theme.windowBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(theme.border, lineWidth: 1)
-            )
-        }
-    }
-
-    private func toggleRow(_ title: String, _ isOn: Bool) -> some View {
-        settingsRow {
-            Text(title)
-                .foregroundStyle(theme.textPrimary)
-            Spacer()
-            Toggle("", isOn: .constant(isOn))
-                .labelsHidden()
+            .accessibilityLabel("Editor Font Size")
+            .accessibilityValue("\(Int(workspaceStore.editorFontSize)) points")
         }
     }
 
@@ -200,18 +191,23 @@ struct SettingsRootView: View {
             HStack(spacing: 10) {
                 ForEach(AccentSwatch.allCases) { swatch in
                     Button {
-                        workspaceStore.accentSwatch = swatch
+                        workspaceStore.setAccentSwatch(swatch)
                     } label: {
                         Circle()
                             .fill(swatch.displayColor)
-                            .frame(width: 18, height: 18)
+                            .frame(width: 20, height: 20)
                             .overlay(
                                 Circle()
                                     .stroke(workspaceStore.accentSwatch == swatch ? theme.textPrimary : .clear, lineWidth: 2)
                                     .padding(-4)
                             )
+                            .frame(width: 34, height: 34)
+                            .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("\(swatch.displayName) Accent")
+                    .accessibilityValue(workspaceStore.accentSwatch == swatch ? "Selected" : "")
+                    .help("\(swatch.displayName) accent")
                 }
             }
         }
@@ -221,6 +217,7 @@ struct SettingsRootView: View {
         settingsRow {
             Text(title)
                 .foregroundStyle(theme.textPrimary)
+                .lineLimit(2)
             Spacer()
             Picker("", selection: selection) {
                 ForEach(Array(values), id: \.self) { value in
@@ -228,7 +225,8 @@ struct SettingsRootView: View {
                 }
             }
             .pickerStyle(.menu)
-            .frame(width: 180)
+            .frame(minWidth: 180, idealWidth: 210, maxWidth: 240)
+            .accessibilityLabel(title)
         }
     }
 
@@ -236,6 +234,7 @@ struct SettingsRootView: View {
         settingsRow {
             Text(title)
                 .foregroundStyle(theme.textPrimary)
+                .lineLimit(2)
             Spacer()
             Text(shortcut)
                 .font(.system(size: 11, weight: .semibold))
@@ -257,7 +256,7 @@ struct SettingsRootView: View {
             }
             .font(.system(size: 13, weight: .medium))
             .padding(.horizontal, 14)
-            .frame(height: 44)
+            .frame(minHeight: 44)
 
             Rectangle()
                 .fill(theme.border)
@@ -271,6 +270,27 @@ struct SettingsRootView: View {
         case .dark: .dark
         case .system: nil
         }
+    }
+
+    private var editorFontSizeBinding: Binding<Double> {
+        Binding(
+            get: { Double(workspaceStore.editorFontSize) },
+            set: { workspaceStore.setEditorFontSize(CGFloat($0)) }
+        )
+    }
+
+    private var themeModeBinding: Binding<ThemePalette> {
+        Binding(
+            get: { workspaceStore.themeMode },
+            set: { workspaceStore.setThemeMode($0) }
+        )
+    }
+
+    private var sidebarMaterialStyleBinding: Binding<SidebarMaterialStyle> {
+        Binding(
+            get: { workspaceStore.sidebarMaterialStyle },
+            set: { workspaceStore.setSidebarMaterialStyle($0) }
+        )
     }
 }
 

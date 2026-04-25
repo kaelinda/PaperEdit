@@ -26,6 +26,7 @@ struct WorkspaceSidebar: View {
                             .font(.system(size: 12, weight: .medium))
                         Text(workspaceRootURL.lastPathComponent)
                             .lineLimit(1)
+                            .truncationMode(.middle)
                     }
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(theme.textSubtle)
@@ -72,6 +73,7 @@ struct WorkspaceSidebar: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(workspaceStore.quickOpenModel.query.isEmpty ? theme.textMuted : theme.textPrimary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
 
                 Spacer(minLength: 0)
 
@@ -88,6 +90,8 @@ struct WorkspaceSidebar: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Search Files")
+        .accessibilityValue(quickOpenEntryTitle)
     }
 
     private var quickOpenEntryTitle: String {
@@ -136,9 +140,11 @@ private struct SidebarSectionView: View {
                 }
                 .foregroundStyle(theme.textMuted)
                 .padding(.horizontal, 8)
-                .frame(height: 24)
+                .frame(minHeight: 30)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("\(section.title) Section")
+            .accessibilityValue(workspaceStore.sidebarSections.contains(section) ? "Expanded" : "Collapsed")
 
             if workspaceStore.sidebarSections.contains(section) {
                 Group {
@@ -167,13 +173,15 @@ private struct SidebarSectionView: View {
                         .font(.system(size: 12, weight: .medium))
                     Text(emptyActionTitle)
                         .font(.system(size: 13, weight: .medium))
+                        .lineLimit(1)
                     Spacer()
                 }
                 .foregroundStyle(theme.textMuted)
                 .padding(.horizontal, 12)
-                .frame(height: 32)
+                .frame(minHeight: 36)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(emptyActionTitle)
         } else {
             Text(emptyStateCopy)
                 .font(.system(size: 13))
@@ -237,6 +245,7 @@ private struct FileTreeNodeRow: View {
 
                         Text(node.name)
                             .lineLimit(1)
+                            .truncationMode(.middle)
                             .font(.system(size: 13, weight: node.kind == .group || node.kind == .project ? .medium : .regular))
                             .foregroundStyle(theme.textPrimary.opacity(node.kind == .project ? 0.9 : 1))
 
@@ -246,6 +255,8 @@ private struct FileTreeNodeRow: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(node.kind == .project)
+                .accessibilityLabel(accessibilityLabel)
+                .accessibilityValue(isContainer ? (isExpanded ? "Expanded" : "Collapsed") : (isSelected ? "Selected" : ""))
 
                 if let sourceURL = node.sourceURL, node.kind == .file, hovering || workspaceStore.isFavorite(sourceURL) {
                     Button {
@@ -257,12 +268,13 @@ private struct FileTreeNodeRow: View {
                             .frame(width: 18, height: 18)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(workspaceStore.isFavorite(sourceURL) ? "Remove \(node.name) from Favorites" : "Add \(node.name) to Favorites")
                 }
             }
             .contentShape(Rectangle())
             .padding(.leading, CGFloat(depth) * 13 + 10)
             .padding(.trailing, 10)
-            .frame(height: 32)
+            .frame(minHeight: 34)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(isSelected ? theme.selectedItemFill : .clear)
@@ -316,6 +328,19 @@ private struct FileTreeNodeRow: View {
             theme.textSubtle
         case .project:
             theme.textPrimary
+        }
+    }
+
+    private var accessibilityLabel: String {
+        switch node.kind {
+        case .file:
+            "File, \(node.name)"
+        case .folder:
+            "Folder, \(node.name)"
+        case .group:
+            "\(node.name) Group"
+        case .project:
+            "Workspace, \(node.name)"
         }
     }
 

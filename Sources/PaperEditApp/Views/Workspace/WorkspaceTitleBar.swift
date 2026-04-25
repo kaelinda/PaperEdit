@@ -73,7 +73,10 @@ struct WorkspaceTitleBar: View {
                         Text(workspaceCaption)
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(theme.textSubtle)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                     }
+                    .frame(minWidth: 0, alignment: .leading)
 
                     Image(systemName: "chevron.down")
                         .font(.system(size: 9, weight: .bold))
@@ -148,6 +151,7 @@ struct WorkspaceTitleBar: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.leading, 4)
+                .accessibilityLabel("New File")
             }
             .padding(4)
         }
@@ -186,9 +190,11 @@ struct WorkspaceTitleBar: View {
                 ToolbarIconButton(symbol: "rectangle.split.2x1", theme: theme) {
                     workspaceStore.setViewMode(.split)
                 }
+                .accessibilityLabel("Show Split Preview")
                 ToolbarIconButton(symbol: "ellipsis", theme: theme) {
                     workspaceStore.openCommandPalette()
                 }
+                .accessibilityLabel("Open Command Palette")
             }
             .padding(4)
             .background(toolbarCapsuleBackground)
@@ -220,8 +226,10 @@ struct WorkspaceTitleBar: View {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(workspaceStore.viewMode == mode ? theme.textPrimary : theme.textMuted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
                 .padding(.horizontal, 14)
-                .frame(height: 28)
+                .frame(height: 30)
                 .background(
                     Capsule(style: .continuous)
                         .fill(workspaceStore.viewMode == mode ? theme.elevatedBackground : .clear)
@@ -233,8 +241,9 @@ struct WorkspaceTitleBar: View {
                 )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(workspaceStore.viewMode == mode ? "Selected" : "")
     }
-
     private var workspaceCaption: String {
         if let url = workspaceStore.workspaceRootURL {
             return url.lastPathComponent
@@ -287,7 +296,7 @@ private struct ToolbarIconButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .frame(width: 30, height: 30)
+            .frame(width: 34, height: 34)
             .foregroundStyle(foregroundColor)
             .background(
                 Circle()
@@ -339,6 +348,7 @@ private struct ToolbarActionLabel: View {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
                 .lineLimit(1)
+                .minimumScaleFactor(0.85)
 
             if let shortcut {
                 Text(shortcut)
@@ -387,6 +397,7 @@ private struct TabChip: View {
             Text(tab.name)
                 .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
+                .truncationMode(.middle)
                 .foregroundStyle(isActive ? theme.textPrimary : theme.textMuted)
 
             if tab.isDirty {
@@ -428,6 +439,7 @@ private struct TabItemView: View {
 
                     Text(tab.name)
                         .lineLimit(1)
+                        .truncationMode(.middle)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(isActive ? theme.textPrimary : theme.textMuted)
 
@@ -465,6 +477,7 @@ private struct TabItemView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.trailing, 8)
+                .accessibilityLabel("Close \(tab.name)")
             }
         }
         .contentShape(Rectangle())

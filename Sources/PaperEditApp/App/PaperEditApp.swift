@@ -33,7 +33,7 @@ struct PaperEditApp: App {
             SettingsRootView()
                 .environmentObject(workspaceStore)
                 .environmentObject(settingsModel)
-                .frame(width: 560, height: 380)
+                .frame(minWidth: 520, idealWidth: 560, maxWidth: 680, minHeight: 420, idealHeight: 480)
         }
     }
 }

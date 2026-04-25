@@ -81,6 +81,7 @@ struct QuickOpenPanelView: View {
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(theme.textPrimary)
             .focused($queryFocused)
+            .accessibilityLabel("Search files by name or path")
             .onSubmit {
                 guard items.indices.contains(workspaceStore.quickOpenModel.selectedIndex) else { return }
                 workspaceStore.openQuickOpenItem(items[workspaceStore.quickOpenModel.selectedIndex])
@@ -96,6 +97,7 @@ struct QuickOpenPanelView: View {
                     .background(theme.hover, in: Circle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Close Quick Open")
         }
         .padding(.horizontal, 12)
         .frame(height: 44)
@@ -162,31 +164,34 @@ private struct QuickOpenPanelRow: View {
             HStack(spacing: 9) {
                 Image(systemName: item.format.iconName)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(isSelected ? theme.accentForeground : Color(hex: item.format.accentHex).opacity(0.88))
+                    .foregroundStyle(isSelected ? theme.accent : Color(hex: item.format.accentHex).opacity(0.88))
                     .frame(width: 16)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.title)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(isSelected ? theme.accentForeground : theme.textPrimary)
+                        .foregroundStyle(theme.textPrimary)
                         .lineLimit(1)
+                        .truncationMode(.middle)
 
                     Text(item.subtitle)
                         .font(.system(size: 10))
-                        .foregroundStyle(isSelected ? theme.accentForeground.opacity(0.82) : theme.textMuted)
+                        .foregroundStyle(theme.textMuted)
                         .lineLimit(1)
+                        .truncationMode(.middle)
                 }
+                .frame(minWidth: 0, alignment: .leading)
 
                 Spacer(minLength: 8)
 
                 Text(item.source.label)
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(isSelected ? theme.accentForeground.opacity(0.9) : theme.textSubtle)
+                    .foregroundStyle(isSelected ? theme.accent : theme.textSubtle)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
                     .background(
                         Capsule(style: .continuous)
-                            .fill(isSelected ? theme.accentForeground.opacity(0.14) : theme.hover)
+                            .fill(isSelected ? theme.accent.opacity(0.14) : theme.hover)
                     )
             }
             .padding(.horizontal, 9)
@@ -202,5 +207,8 @@ private struct QuickOpenPanelRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.title), \(item.subtitle), \(item.source.label)")
+        .accessibilityValue(isSelected ? "Selected" : "")
     }
 }
