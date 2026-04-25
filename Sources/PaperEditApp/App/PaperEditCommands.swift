@@ -4,8 +4,16 @@ import SwiftUI
 struct PaperEditCommands: Commands {
     @ObservedObject var workspaceStore: WorkspaceStore
     @ObservedObject var settingsModel: SettingsWindowModel
+    @ObservedObject var updateController: UpdateController
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates...") {
+                updateController.checkForUpdates()
+            }
+            .disabled(!updateController.canCheckForUpdates)
+        }
+
         CommandGroup(replacing: .newItem) {
             Button("New File") {
                 workspaceStore.createUntitledTab()

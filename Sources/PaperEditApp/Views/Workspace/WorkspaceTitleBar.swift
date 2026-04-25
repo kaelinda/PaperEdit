@@ -50,7 +50,7 @@ struct WorkspaceTitleBar: View {
     }
 
     private var leftCluster: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Menu {
                 Button("New File") { workspaceStore.createUntitledTab() }
                 Button("Open File...") { workspaceStore.presentOpenPanel() }
@@ -79,25 +79,42 @@ struct WorkspaceTitleBar: View {
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(theme.textSubtle)
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 9)
                 .padding(.vertical, 6)
                 .background(toolbarCapsuleBackground)
             }
             .menuStyle(.borderlessButton)
+            .help("PaperEdit menu")
 
-            HStack(spacing: 6) {
-                ToolbarIconButton(symbol: "doc.badge.plus", theme: theme) {
-                    workspaceStore.createUntitledTab()
+            HStack(spacing: 4) {
+                Menu {
+                    Button("New File") { workspaceStore.createUntitledTab() }
+                    Divider()
+                    Button("Open File...") { workspaceStore.presentOpenPanel() }
+                    Button("Open Folder...") { workspaceStore.presentOpenFolderPanel() }
+                } label: {
+                    ToolbarActionLabel(symbol: "folder", title: "Open", theme: theme, trailingSymbol: "chevron.down")
                 }
-                ToolbarIconButton(symbol: "magnifyingglass", theme: theme) {
+                .menuStyle(.borderlessButton)
+                .help("Open a file or folder")
+
+                Button {
                     workspaceStore.openQuickOpen()
+                } label: {
+                    ToolbarActionLabel(symbol: "magnifyingglass", title: "Find", theme: theme, shortcut: "⌘P")
                 }
-                ToolbarIconButton(symbol: "square.and.arrow.up", theme: theme) {
+                .buttonStyle(.plain)
+                .help("Find a file in the current workspace")
+
+                Button {
                     _ = workspaceStore.saveActiveTab()
+                } label: {
+                    ToolbarActionLabel(symbol: "square.and.arrow.down", title: "Save", theme: theme)
                 }
+                .buttonStyle(.plain)
+                .disabled(workspaceStore.activeTab == nil)
+                .help("Save current file")
             }
-            .padding(4)
-            .background(toolbarCapsuleBackground)
         }
     }
 
@@ -301,6 +318,58 @@ private struct ToolbarIconButtonStyle: ButtonStyle {
             return theme.selectedItemFill
         }
         return hovering ? theme.hover : .clear
+    }
+}
+
+private struct ToolbarActionLabel: View {
+    let symbol: String
+    let title: String
+    let theme: PaperTheme
+    var trailingSymbol: String?
+    var shortcut: String?
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 14)
+
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+
+            if let shortcut {
+                Text(shortcut)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(foregroundColor.opacity(0.66))
+                    .padding(.leading, 1)
+            }
+
+            if let trailingSymbol {
+                Image(systemName: trailingSymbol)
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(foregroundColor.opacity(0.7))
+            }
+        }
+        .foregroundStyle(foregroundColor)
+        .frame(height: 30)
+        .padding(.horizontal, 9)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(hovering && isEnabled ? theme.hover : theme.secondaryElevatedBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(theme.border, lineWidth: 1)
+        )
+        .opacity(isEnabled ? 1 : 0.46)
+        .onHover { hovering = $0 }
+    }
+
+    private var foregroundColor: Color {
+        isEnabled ? theme.textPrimary : theme.textMuted
     }
 }
 

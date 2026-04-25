@@ -6,6 +6,7 @@ struct PaperEditApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var workspaceStore = WorkspaceStore()
     @StateObject private var settingsModel = SettingsWindowModel()
+    @StateObject private var updateController = UpdateController()
 
     var body: some Scene {
         WindowGroup("PaperEdit", id: "workspace") {
@@ -21,7 +22,11 @@ struct PaperEditApp: App {
         }
         .defaultSize(width: 1200, height: 780)
         .commands {
-            PaperEditCommands(workspaceStore: workspaceStore, settingsModel: settingsModel)
+            PaperEditCommands(
+                workspaceStore: workspaceStore,
+                settingsModel: settingsModel,
+                updateController: updateController
+            )
         }
 
         Settings {

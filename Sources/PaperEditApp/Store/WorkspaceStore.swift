@@ -442,33 +442,31 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func quickOpenItems(matching rawQuery: String? = nil) -> [QuickOpenItem] {
-        let query = (rawQuery ?? quickOpenModel.query)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
+        let tokens = quickOpenSearchTokens(from: rawQuery ?? quickOpenModel.query)
         var seenPaths = Set<String>()
 
         let workspaceMatches = workspaceFileIndex
             .filter { FileManager.default.fileExists(atPath: $0.path) }
-            .filter { query.isEmpty || $0.lastPathComponent.lowercased().contains(query) }
+            .filter { quickOpenURL($0, matches: tokens) }
             .compactMap { url -> QuickOpenItem? in
                 guard seenPaths.insert(normalizedFilePath(for: url)).inserted else { return nil }
                 return QuickOpenItem(
                     title: url.lastPathComponent,
-                    subtitle: url.deletingLastPathComponent().path,
+                    subtitle: quickOpenSubtitle(for: url),
                     sourceURL: url,
                     format: EditorFileFormat(fileURL: url),
                     source: .workspace
                 )
-        }
+            }
 
         let recentMatches = recentFileURLs
             .filter { FileManager.default.fileExists(atPath: $0.path) }
-            .filter { query.isEmpty || $0.lastPathComponent.lowercased().contains(query) }
+            .filter { quickOpenURL($0, matches: tokens) }
             .compactMap { url -> QuickOpenItem? in
                 guard seenPaths.insert(normalizedFilePath(for: url)).inserted else { return nil }
                 return QuickOpenItem(
                     title: url.lastPathComponent,
-                    subtitle: url.deletingLastPathComponent().path,
+                    subtitle: quickOpenSubtitle(for: url),
                     sourceURL: url,
                     format: EditorFileFormat(fileURL: url),
                     source: .recent
@@ -476,6 +474,44 @@ final class WorkspaceStore: ObservableObject {
             }
 
         return workspaceMatches + recentMatches
+    }
+
+    private func quickOpenSearchTokens(from query: String) -> [String] {
+        query
+            .lowercased()
+            .split { character in
+                character.isWhitespace || character == "/" || character == "\\"
+            }
+            .map(String.init)
+    }
+
+    private func quickOpenURL(_ url: URL, matches tokens: [String]) -> Bool {
+        guard !tokens.isEmpty else { return true }
+        let haystack = [
+            url.lastPathComponent,
+            url.deletingLastPathComponent().path,
+            quickOpenSubtitle(for: url),
+        ]
+        .joined(separator: " ")
+        .lowercased()
+
+        return tokens.allSatisfy { haystack.contains($0) }
+    }
+
+    private func quickOpenSubtitle(for url: URL) -> String {
+        guard let workspaceRootURL else {
+            return url.deletingLastPathComponent().path
+        }
+
+        let rootPath = normalizedFilePath(for: workspaceRootURL)
+        let filePath = normalizedFilePath(for: url)
+        guard filePath == rootPath || filePath.hasPrefix(rootPath + "/") else {
+            return url.deletingLastPathComponent().path
+        }
+
+        let relativePath = String(filePath.dropFirst(rootPath.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let relativeDirectory = (relativePath as NSString).deletingLastPathComponent
+        return relativeDirectory.isEmpty ? workspaceRootURL.lastPathComponent : "\(workspaceRootURL.lastPathComponent)/\(relativeDirectory)"
     }
 
     func openQuickOpenItem(_ item: QuickOpenItem) {

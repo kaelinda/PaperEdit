@@ -92,7 +92,7 @@ struct WorkspaceSidebar: View {
 
     private var quickOpenEntryTitle: String {
         let query = workspaceStore.quickOpenModel.query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return query.isEmpty ? "Quick Open" : query
+        return query.isEmpty ? "Search files" : query
     }
 
     @ViewBuilder

@@ -69,16 +69,26 @@ swift test
 项目提供发布脚本，用于构建 release 可执行文件、生成 macOS `.app` 包、签名并压缩为 zip：
 
 ```bash
-./scripts/build_release_app.sh 0.1.3
+./scripts/build_release_app.sh 0.1.4
 ```
 
 生成结果位于 `dist/`：
 
 - `dist/PaperEdit.app`
 - `dist/paper`
-- `dist/PaperEdit-0.1.3-macOS.zip`
+- `dist/PaperEdit-0.1.4-macOS.zip`
 
 发布脚本依赖 `Assets/AppIcon.png` 生成 `.icns` 图标文件。
+
+自动更新基于 Sparkle。发布正式构建前先生成 Sparkle EdDSA 密钥，将私钥保存在发布机钥匙串或 CI secret 中，构建时写入公开验签 key：
+
+```bash
+SPARKLE_PUBLIC_ED_KEY="your-public-ed-key" \
+APPCAST_URL="https://github.com/kaelinda/PaperEdit/releases/latest/download/appcast.xml" \
+./scripts/build_release_app.sh 0.1.4
+```
+
+每次发布 zip 后，用 Sparkle 的 `generate_appcast` 为 `dist/` 生成 appcast，并把 `appcast.xml` 与 zip 一起上传到 GitHub Release。应用启动后会按 Sparkle 策略自动检查更新，也可以通过 `PaperEdit > Check for Updates...` 手动检查。
 
 ## 项目结构
 
@@ -124,6 +134,12 @@ swift test
 | `Command + ,` | 打开设置 |
 
 ## 版本更新
+
+### v0.1.4
+
+- 新增 Sparkle 自动更新能力，应用启动后会按更新策略检查版本，并在 `PaperEdit > Check for Updates...` 支持手动检查。
+- Quick Open 支持按文件名、文件夹名和部分路径组合搜索，工作区文件会显示更短的相对路径。
+- 标题栏操作区调整为更清晰的 Open、Find、Save 控件，常用文件入口更贴近轻量编辑场景。
 
 ### v0.1.3
 

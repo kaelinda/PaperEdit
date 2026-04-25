@@ -13,14 +13,23 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "PaperEditApp"
+            name: "PaperEditApp",
+            swiftSettings: [
+                .unsafeFlags(["-F", "ThirdParty"]),
+            ],
+            linkerSettings: [
+                .unsafeFlags(["-F", "ThirdParty", "-framework", "Sparkle", "-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"]),
+            ]
         ),
         .executableTarget(
             name: "paper"
         ),
         .testTarget(
             name: "PaperEditAppTests",
-            dependencies: ["PaperEditApp"]
+            dependencies: ["PaperEditApp"],
+            swiftSettings: [
+                .unsafeFlags(["-F", "ThirdParty"]),
+            ]
         ),
     ],
     swiftLanguageModes: [.v6]

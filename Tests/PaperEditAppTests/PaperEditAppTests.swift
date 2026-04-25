@@ -192,6 +192,29 @@ import Testing
 }
 
 @MainActor
+@Test func quickOpenSearchMatchesFolderNamesAndPartialPaths() throws {
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let nestedDirectory = tempDirectory
+        .appendingPathComponent("configs")
+        .appendingPathComponent("prod")
+    try FileManager.default.createDirectory(at: nestedDirectory, withIntermediateDirectories: true)
+
+    let configURL = nestedDirectory.appendingPathComponent("settings.json")
+    try "{}".write(to: configURL, atomically: true, encoding: .utf8)
+
+    let store = WorkspaceStore()
+    store.workspaceRootURL = tempDirectory
+    store.openQuickOpen(prefill: "prod settings")
+
+    let results = store.quickOpenItems()
+    #expect(results.map { $0.sourceURL.resolvingSymlinksInPath().path } == [configURL.resolvingSymlinksInPath().path])
+    #expect(results.first?.subtitle == "\(tempDirectory.lastPathComponent)/configs/prod")
+}
+
+@MainActor
 @Test func quickOpenOmitsDeletedRecentFilesAndRefusesToOpenThem() throws {
     let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)

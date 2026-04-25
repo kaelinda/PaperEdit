@@ -73,7 +73,7 @@ struct QuickOpenPanelView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(theme.textSubtle)
 
-            TextField("Type a filename...", text: Binding(
+            TextField("Search files by name or path", text: Binding(
                 get: { workspaceStore.quickOpenModel.query },
                 set: { workspaceStore.quickOpenModel.query = $0 }
             ))
@@ -98,7 +98,7 @@ struct QuickOpenPanelView: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 12)
-        .frame(height: 40)
+        .frame(height: 44)
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(theme.border)
@@ -139,7 +139,7 @@ struct QuickOpenPanelView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(theme.textPrimary)
 
-            Text("Search workspace files first, then recent files.")
+            Text("Try a filename, folder name, or partial path.")
                 .font(.system(size: 11))
                 .foregroundStyle(theme.textMuted)
                 .multilineTextAlignment(.center)
