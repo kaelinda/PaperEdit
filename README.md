@@ -69,14 +69,14 @@ swift test
 项目提供发布脚本，用于构建 release 可执行文件、生成 macOS `.app` 包、签名并压缩为 zip：
 
 ```bash
-./scripts/build_release_app.sh 0.1.4
+./scripts/build_release_app.sh 0.1.5
 ```
 
 生成结果位于 `dist/`：
 
 - `dist/PaperEdit.app`
 - `dist/paper`
-- `dist/PaperEdit-0.1.4-macOS.zip`
+- `dist/PaperEdit-0.1.5-macOS.zip`
 
 发布脚本依赖 `Assets/AppIcon.png` 生成 `.icns` 图标文件。
 
@@ -85,7 +85,7 @@ swift test
 ```bash
 SPARKLE_PUBLIC_ED_KEY="your-public-ed-key" \
 APPCAST_URL="https://github.com/kaelinda/PaperEdit/releases/latest/download/appcast.xml" \
-./scripts/build_release_app.sh 0.1.4
+./scripts/build_release_app.sh 0.1.5
 ```
 
 每次发布 zip 后，用 Sparkle 的 `generate_appcast` 为 `dist/` 生成 appcast，并把 `appcast.xml` 与 zip 一起上传到 GitHub Release。应用启动后会按 Sparkle 策略自动检查更新，也可以通过 `PaperEdit > Check for Updates...` 手动检查。
@@ -134,6 +134,12 @@ APPCAST_URL="https://github.com/kaelinda/PaperEdit/releases/latest/download/appc
 | `Command + ,` | 打开设置 |
 
 ## 版本更新
+
+### v0.1.5
+
+- 设置面板的主题、强调色、材质和字号改为真实可操作并持久化的偏好设置，补上恢复默认入口。
+- Quick Open、命令面板、标题栏和侧边栏增强了选中态、可访问标签、长文本截断与对比度表现，收紧轻量编辑场景下的交互细节。
+- 官网移动端布局补齐导航与应用预览适配，编辑器输入热路径和首屏图标加载链路同步优化，减少整篇重高亮和无意义重绘。
 
 ### v0.1.4
 
