@@ -104,8 +104,7 @@ private struct NativeCodeTextView: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard !applyExternalUpdate, let textView = notification.object as? NSTextView else { return }
-            containerView?.refreshLineNumbers()
-            containerView?.rehighlight(language: parent.language, theme: parent.theme, isDark: parent.isDark)
+            containerView?.markNeedsSyntaxRefresh()
             parent.onTextChange(textView.string, textView.selectedRange())
         }
 
@@ -130,6 +129,8 @@ private final class EditorTextContainerView: NSView {
     private var currentLanguage: EditorFileFormat = .plainText
     private var currentIsDark = false
     private var currentFontSize = WorkspaceStore.defaultEditorFontSize
+    private var currentHighlightedLineRange: NSRange?
+    private var needsSyntaxRefresh = false
 
     init(showLineNumbers: Bool) {
         textView = Self.makeEditorTextView()
@@ -181,11 +182,12 @@ private final class EditorTextContainerView: NSView {
         gutterWidthConstraint.constant = showLineNumbers ? gutterWidth : 0
         gutterScrollView.isHidden = !showLineNumbers
 
-        let needsHighlightRefresh = textView.string != text
+        let needsHighlightRefresh = needsSyntaxRefresh
+            || textView.string != text
             || currentLanguage != language
             || currentIsDark != isDark
             || currentFontSize != fontSize
-            || textView.selectedRange() != selection
+        let selectionChanged = textView.selectedRange() != selection
 
         currentLanguage = language
         currentTheme = theme
@@ -200,23 +202,31 @@ private final class EditorTextContainerView: NSView {
                 isDark: isDark,
                 fontSize: fontSize
             ))
-            highlightCurrentLine(in: highlighted, selection: selection, theme: theme)
+            applyCurrentLineHighlight(in: highlighted, selection: selection, theme: theme)
             textView.textStorage?.setAttributedString(highlighted)
             textView.typingAttributes = SyntaxHighlighter.baseAttributes(theme: theme, fontSize: fontSize)
-            refreshLineNumbers()
+            refreshLineNumbers(selection: selection)
+            needsSyntaxRefresh = false
+        } else if selectionChanged {
+            refreshCurrentLineHighlight(selection: selection, theme: theme)
+            refreshLineNumbers(selection: selection)
         } else if textView.typingAttributes[.foregroundColor] == nil {
             textView.typingAttributes = SyntaxHighlighter.baseAttributes(theme: theme, fontSize: fontSize)
         }
 
-        if textView.selectedRange() != selection {
+        if selectionChanged {
             textView.setSelectedRange(selection)
             textView.scrollRangeToVisible(selection)
         }
     }
 
-    func refreshLineNumbers() {
+    func markNeedsSyntaxRefresh() {
+        needsSyntaxRefresh = true
+    }
+
+    func refreshLineNumbers(selection: NSRange? = nil) {
         let lineCount = max(1, textView.string.components(separatedBy: "\n").count)
-        let activeLine = currentLineNumber(for: textView.selectedRange())
+        let activeLine = currentLineNumber(for: selection ?? textView.selectedRange())
         let paragraphStyle = SyntaxHighlighter.paragraphStyle(fontSize: currentFontSize)
         paragraphStyle.alignment = .right
         let attributed = NSMutableAttributedString()
@@ -243,25 +253,6 @@ private final class EditorTextContainerView: NSView {
         }
 
         gutterTextView.textStorage?.setAttributedString(attributed)
-    }
-
-    func rehighlight(language: EditorFileFormat, theme: PaperTheme, isDark: Bool) {
-        currentLanguage = language
-        currentTheme = theme
-        currentIsDark = isDark
-        let selection = textView.selectedRange()
-        let highlighted = NSMutableAttributedString(attributedString: SyntaxHighlighter.highlightedText(
-            for: textView.string,
-            language: language,
-            theme: theme,
-            isDark: isDark,
-            fontSize: currentFontSize
-        ))
-        highlightCurrentLine(in: highlighted, selection: selection, theme: theme)
-        textView.textStorage?.setAttributedString(highlighted)
-        textView.typingAttributes = SyntaxHighlighter.baseAttributes(theme: theme, fontSize: currentFontSize)
-        textView.setSelectedRange(selection)
-        refreshLineNumbers()
     }
 
     private func configureLayout() {
@@ -359,16 +350,35 @@ private final class EditorTextContainerView: NSView {
         return max(1, prefix.components(separatedBy: "\n").count)
     }
 
-    private func highlightCurrentLine(
+    private func refreshCurrentLineHighlight(selection: NSRange, theme: PaperTheme) {
+        guard let textStorage = textView.textStorage else { return }
+        clearCurrentLineHighlight(in: textStorage)
+        applyCurrentLineHighlight(in: textStorage, selection: selection, theme: theme)
+    }
+
+    private func clearCurrentLineHighlight(in attributed: NSMutableAttributedString) {
+        guard let currentHighlightedLineRange else { return }
+        let safeLength = attributed.length
+        guard NSMaxRange(currentHighlightedLineRange) <= safeLength else {
+            self.currentHighlightedLineRange = nil
+            return
+        }
+        attributed.removeAttribute(.backgroundColor, range: currentHighlightedLineRange)
+        self.currentHighlightedLineRange = nil
+    }
+
+    private func applyCurrentLineHighlight(
         in attributed: NSMutableAttributedString,
         selection: NSRange,
         theme: PaperTheme
     ) {
+        clearCurrentLineHighlight(in: attributed)
         let text = attributed.string as NSString
         guard text.length > 0 else { return }
         let location = min(selection.location, text.length - 1)
         let lineRange = text.lineRange(for: NSRange(location: location, length: 0))
         attributed.addAttribute(.backgroundColor, value: NSColor(theme.currentLine), range: lineRange)
+        currentHighlightedLineRange = lineRange
     }
 
     private static func makeEditorTextView() -> NSTextView {

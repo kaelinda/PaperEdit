@@ -358,15 +358,13 @@ final class WorkspaceStore: ObservableObject {
         if previousText != text {
             openTabs[index].isDirty = true
         }
-        persistState()
         refreshStatus()
     }
 
     func updateSelection(_ selection: NSRange) {
         guard let index = activeTabIndex else { return }
         openTabs[index].selection = selection
-        persistState()
-        refreshStatus()
+        refreshStatus(recalculateMetrics: false)
     }
 
     func setViewMode(_ mode: EditorViewMode) {
@@ -862,7 +860,7 @@ final class WorkspaceStore: ObservableObject {
             }
     }
 
-    private func refreshStatus() {
+    private func refreshStatus(recalculateMetrics: Bool = true) {
         guard let tab = activeTab else {
             status = .empty
             return
@@ -874,14 +872,17 @@ final class WorkspaceStore: ObservableObject {
         let lines = prefix.components(separatedBy: "\n")
         let line = max(1, lines.count)
         let column = (lines.last?.count ?? 0) + 1
-        let metricValue: String = {
-            switch tab.format {
+        let metricValue: String
+        if recalculateMetrics {
+            metricValue = switch tab.format {
             case .markdown:
                 "\(tab.text.split(whereSeparator: \.isWhitespace).count) words"
             default:
                 "\(tab.text.components(separatedBy: "\n").count) lines"
             }
-        }()
+        } else {
+            metricValue = status.metrics
+        }
 
         status = EditorStatus(
             format: tab.format.displayName,

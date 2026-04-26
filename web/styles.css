@@ -459,6 +459,8 @@ pre {
 
 .feature-row {
   align-items: center;
+  contain-intrinsic-size: 720px;
+  content-visibility: auto;
   display: grid;
   gap: 70px;
   grid-template-columns: 420px minmax(0, 1fr);
@@ -521,6 +523,7 @@ pre {
   border: 1px solid var(--rule-strong);
   border-radius: 22px;
   box-shadow: 0 22px 70px rgba(26, 27, 31, 0.12);
+  contain: layout paint;
   min-height: 420px;
   overflow: hidden;
 }
@@ -632,6 +635,8 @@ kbd {
 
 .download-section {
   border-top: 1px solid var(--rule);
+  contain-intrinsic-size: 440px;
+  content-visibility: auto;
   margin: 40px auto 0;
   max-width: 760px;
   padding: 90px 28px 100px;

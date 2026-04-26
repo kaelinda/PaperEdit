@@ -9,14 +9,16 @@
       name="description"
       content="PaperEdit 是一款轻量原生 macOS 编辑器，适合快速编辑 Markdown、JSON、YAML、TOML、XML、plist 和纯文本文件。"
     >
-    <link rel="icon" href="./assets/app-icon.png">
+    <link rel="preload" href="./assets/app-icon.svg" as="image" type="image/svg+xml">
+    <link rel="icon" href="./assets/app-icon.svg" type="image/svg+xml">
+    <link rel="alternate icon" href="./assets/app-icon.png" type="image/png">
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
     <header class="site-header">
       <a class="brand" href="#top" aria-label="PaperEdit home">
-        <img src="./assets/app-icon.png" alt="" width="28" height="28">
+        <img src="./assets/app-icon.svg" alt="" width="28" height="28" decoding="async">
         <span>PaperEdit</span>
       </a>
       <nav aria-label="主导航">
@@ -29,7 +31,7 @@
 
     <main id="top">
       <section class="hero" aria-labelledby="hero-title">
-        <img class="hero-icon" src="./assets/app-icon.png" alt="PaperEdit app icon" width="104" height="104">
+        <img class="hero-icon" src="./assets/app-icon.svg" alt="PaperEdit app icon" width="104" height="104" fetchpriority="high" decoding="async">
         <p class="eyebrow" data-i18n="hero.eyebrow">PaperEdit for macOS. SwiftUI 构建。</p>
         <h1 id="hero-title" data-i18n="hero.title">安静、原生，专为快速文件编辑而生。</h1>
         <p class="hero-copy" data-i18n="hero.copy">
