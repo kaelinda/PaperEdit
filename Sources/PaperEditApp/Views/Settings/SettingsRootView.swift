@@ -1,9 +1,13 @@
+import AppKit
 import SwiftUI
 
 struct SettingsRootView: View {
     @EnvironmentObject private var workspaceStore: WorkspaceStore
     @EnvironmentObject private var settingsModel: SettingsWindowModel
+    @EnvironmentObject private var cloudSyncStore: CloudSyncStore
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var showSyncedPulse = false
 
     private var theme: PaperTheme {
         PaperTheme.resolve(from: workspaceStore.themeMode, colorScheme: colorScheme, accentSwatch: workspaceStore.accentSwatch)
@@ -55,12 +59,7 @@ struct SettingsRootView: View {
 
                 Spacer()
 
-                Button("Cancel") {
-                    NSApp.keyWindow?.close()
-                }
-                .buttonStyle(.bordered)
-
-                Button("OK") {
+                Button("Done") {
                     NSApp.keyWindow?.close()
                 }
                 .buttonStyle(.borderedProminent)
@@ -100,7 +99,7 @@ struct SettingsRootView: View {
         switch settingsModel.selectedPane {
         case .general:
             settingsCard("Workspace") {
-                labeledValueRow("Startup", value: "Restore previous tabs")
+                labeledValueRow("Startup", value: "Restore saved-file tabs")
                 labeledValueRow("Default open behavior", value: "Last workspace")
             }
         case .editor:
@@ -119,6 +118,26 @@ struct SettingsRootView: View {
                 labeledPickerRow("Color Theme", selection: themeModeBinding, values: ThemePalette.allCases)
                 accentRow
                 labeledPickerRow("Sidebar Material", selection: sidebarMaterialStyleBinding, values: SidebarMaterialStyle.allCases)
+            }
+        case .sync:
+            settingsCard("iCloud Sync") {
+                syncToggleRow
+                Group {
+                    syncScopeRow
+                    syncStatusRow
+                    syncPrivacyNoteRow
+                    syncPathNoteRow
+                }
+                .opacity(workspaceStore.iCloudSyncEnabled ? 1.0 : 0.6)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: workspaceStore.iCloudSyncEnabled)
+            }
+            .onChange(of: cloudSyncStore.status) { _, newValue in
+                guard case .synced = newValue, !showSyncedPulse else { return }
+                showSyncedPulse = true
+                Task {
+                    try? await Task.sleep(for: .seconds(2))
+                    showSyncedPulse = false
+                }
             }
         case .shortcuts:
             settingsCard("Core Shortcuts") {
@@ -290,6 +309,139 @@ struct SettingsRootView: View {
         Binding(
             get: { workspaceStore.sidebarMaterialStyle },
             set: { workspaceStore.setSidebarMaterialStyle($0) }
+        )
+    }
+
+    private var syncToggleRow: some View {
+        settingsRow {
+            Text("Sync preferences across Macs")
+                .foregroundStyle(theme.textPrimary)
+            Spacer()
+            Toggle("", isOn: iCloudSyncBinding)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .accessibilityLabel("iCloud preferences sync")
+        }
+    }
+
+    private var syncScopeRow: some View {
+        settingsRow {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Synced settings")
+                    .foregroundStyle(theme.textPrimary)
+                Text("Theme · Font size · Accent · Sidebar · Favorites · Recents · Workspace")
+                    .foregroundStyle(theme.textMuted)
+                    .font(.system(size: 12))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Synced settings: Theme, Font size, Accent, Sidebar, Favorites, Recents, Workspace")
+            Spacer()
+        }
+    }
+
+    private var syncStatusRow: some View {
+        settingsRow {
+            Text("Last synced")
+                .foregroundStyle(theme.textPrimary)
+            Spacer()
+            Text(syncStatusText)
+                .foregroundStyle(syncStatusColor)
+                .accessibilityLabel(showSyncedPulse ? "Just synced" : "Sync status: \(syncStatusText)")
+                .lineLimit(2)
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
+            syncStatusTrailing
+        }
+    }
+
+    @ViewBuilder
+    private var syncStatusTrailing: some View {
+        switch cloudSyncStore.status {
+        case .syncing:
+            ProgressView()
+                .controlSize(.small)
+                .accessibilityLabel("Syncing")
+        case .unavailable:
+            Button("Open iCloud Settings") {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preferences.AppleIDPrefPane?iCloud") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            .buttonStyle(.link)
+            .accessibilityHint("Opens iCloud settings to sign in")
+        default:
+            Button("Sync Now") {
+                Task {
+                    await cloudSyncStore.syncNow(workspaceStore: workspaceStore)
+                }
+            }
+            .disabled(!workspaceStore.iCloudSyncEnabled)
+        }
+    }
+
+    private var syncPrivacyNoteRow: some View {
+        settingsRow {
+            Text("Stored in your private iCloud. PaperEdit and Anthropic never see it. Sign out of iCloud or delete the PaperEditPreferences record from iCloud Settings to remove it.")
+                .foregroundStyle(theme.textMuted)
+                .font(.system(size: 12))
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+        }
+    }
+
+    private var syncPathNoteRow: some View {
+        settingsRow {
+            Text("File shortcuts only appear on this Mac when the path exists locally.")
+                .foregroundStyle(theme.textMuted)
+                .font(.system(size: 12))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+        }
+    }
+
+    private var syncStatusText: String {
+        switch cloudSyncStore.status {
+        case .idle:
+            return workspaceStore.iCloudSyncEnabled ? "Not yet synced" : "Off"
+        case .syncing:
+            return "Syncing…"
+        case .synced:
+            if showSyncedPulse {
+                return "✓ Just now"
+            }
+            if let lastSyncedAt = cloudSyncStore.lastSyncedAt {
+                let formatter = RelativeDateTimeFormatter()
+                formatter.unitsStyle = .short
+                return formatter.localizedString(for: lastSyncedAt, relativeTo: Date())
+            }
+            return "Synced"
+        case .unavailable(let message), .failed(let message):
+            return message
+        }
+    }
+
+    private var syncStatusColor: Color {
+        switch cloudSyncStore.status {
+        case .failed, .unavailable:
+            return theme.danger
+        default:
+            return theme.textMuted
+        }
+    }
+
+    private var iCloudSyncBinding: Binding<Bool> {
+        Binding(
+            get: { workspaceStore.iCloudSyncEnabled },
+            set: { newValue in
+                workspaceStore.setICloudSyncEnabled(newValue)
+                if newValue {
+                    Task { await cloudSyncStore.syncNow(workspaceStore: workspaceStore) }
+                }
+            }
         )
     }
 }

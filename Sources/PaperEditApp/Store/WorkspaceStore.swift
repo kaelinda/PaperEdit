@@ -13,6 +13,7 @@ final class WorkspaceStore: ObservableObject {
         static let sidebarMaterialStyle = "paperedit.sidebar-material-style"
         static let accentSwatch = "paperedit.accent-swatch"
         static let sessionSnapshot = "paperedit.session-snapshot"
+        static let iCloudSyncEnabled = "paperedit.icloud-sync-enabled"
     }
 
     static let defaultEditorFontSize: CGFloat = 14
@@ -46,6 +47,7 @@ final class WorkspaceStore: ObservableObject {
     }
     @Published var favoriteFileURLs: [URL] = []
     @Published var recentFileURLs: [URL] = []
+    @Published var iCloudSyncEnabled: Bool = false
     @Published var pendingDraftRecovery: [DraftSnapshot] = []
     @Published var recoveryMessage: String?
 
@@ -430,6 +432,11 @@ final class WorkspaceStore: ObservableObject {
         accentSwatch = WorkspaceStore.defaultAccentSwatch
         editorFontSize = WorkspaceStore.defaultEditorFontSize
         sidebarWidth = WorkspaceStore.defaultSidebarWidth
+        persistState()
+    }
+
+    func setICloudSyncEnabled(_ enabled: Bool) {
+        iCloudSyncEnabled = enabled
         persistState()
     }
 
@@ -919,6 +926,7 @@ final class WorkspaceStore: ObservableObject {
         defaults.set(themeMode.rawValue, forKey: StorageKey.themeMode)
         defaults.set(sidebarMaterialStyle.rawValue, forKey: StorageKey.sidebarMaterialStyle)
         defaults.set(accentSwatch.rawValue, forKey: StorageKey.accentSwatch)
+        defaults.set(iCloudSyncEnabled, forKey: StorageKey.iCloudSyncEnabled)
         persistSessionSnapshot()
     }
 
@@ -953,6 +961,8 @@ final class WorkspaceStore: ObservableObject {
            let restoredAccentSwatch = AccentSwatch(rawValue: storedAccentSwatch) {
             accentSwatch = restoredAccentSwatch
         }
+
+        iCloudSyncEnabled = defaults.bool(forKey: StorageKey.iCloudSyncEnabled)
 
         activeScene = .emptyState
         restoreSessionSnapshot()

@@ -177,6 +177,7 @@ enum PreferencePane: String, CaseIterable, Codable, Identifiable {
     case general
     case editor
     case appearance
+    case sync
     case shortcuts
 
     var id: String { rawValue }
@@ -190,6 +191,7 @@ enum PreferencePane: String, CaseIterable, Codable, Identifiable {
         case .general: "gearshape"
         case .editor: "text.cursor"
         case .appearance: "paintpalette"
+        case .sync: "icloud"
         case .shortcuts: "command"
         }
     }
@@ -303,17 +305,13 @@ struct EditorStatus: Equatable {
     var line: Int
     var column: Int
     var metrics: String
-    var gitBranch: String
-    var lspOnline: Bool
 
     static let empty = EditorStatus(
         format: "Ready",
         encoding: "",
         line: 1,
         column: 1,
-        metrics: "",
-        gitBranch: "main",
-        lspOnline: true
+        metrics: ""
     )
 }
 
@@ -327,6 +325,8 @@ struct EditorTab: Identifiable, Hashable {
     var selection: NSRange
     var foldMarkers: [EditorFoldMarker]
     var showsFolding: Bool
+    var fileBaseline: FileBaseline?
+    var conflictState: FileConflictState
 
     init(
         id: UUID = UUID(),
@@ -337,7 +337,9 @@ struct EditorTab: Identifiable, Hashable {
         isDirty: Bool = false,
         selection: NSRange = NSRange(location: 0, length: 0),
         foldMarkers: [EditorFoldMarker] = [],
-        showsFolding: Bool = false
+        showsFolding: Bool = false,
+        fileBaseline: FileBaseline? = nil,
+        conflictState: FileConflictState = .none
     ) {
         self.id = id
         self.name = name
@@ -348,6 +350,8 @@ struct EditorTab: Identifiable, Hashable {
         self.selection = selection
         self.foldMarkers = foldMarkers
         self.showsFolding = showsFolding
+        self.fileBaseline = fileBaseline
+        self.conflictState = conflictState
     }
 }
 
