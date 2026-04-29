@@ -110,7 +110,9 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 PLIST
 
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
-codesign --force --deep --sign - "$APP_DIR" >/dev/null
+codesign --force --deep --sign - \
+  --entitlements "$ROOT_DIR/Sources/PaperEditApp/App/PaperEditApp.entitlements" \
+  "$APP_DIR" >/dev/null
 
 ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$ZIP_PATH"
 
