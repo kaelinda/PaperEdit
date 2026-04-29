@@ -448,6 +448,35 @@ final class WorkspaceStore: ObservableObject {
         )
     }
 
+    func applySyncSnapshot(_ snapshot: WorkspaceSyncSnapshot) {
+        guard snapshot.schemaVersion == WorkspaceSyncSnapshot.currentSchemaVersion else { return }
+
+        themeMode = snapshot.themeMode
+        accentSwatch = snapshot.accentSwatch
+        sidebarMaterialStyle = snapshot.sidebarMaterialStyle
+        sidebarSections = Set(snapshot.sidebarSections)
+        editorFontSize = clampedEditorFontSize(CGFloat(snapshot.editorFontSize))
+        favoriteFileURLs = existingFileURLs(from: snapshot.favoriteFilePaths)
+        recentFileURLs = existingFileURLs(from: snapshot.recentFilePaths)
+
+        if let workspaceRootPath = snapshot.workspaceRootPath {
+            let url = URL(fileURLWithPath: workspaceRootPath)
+            if isDirectory(url) {
+                workspaceRootURL = url
+                expandedNodeIDs.insert(url.path)
+            }
+        }
+
+        persistState()
+        refreshStatus()
+    }
+
+    private func existingFileURLs(from paths: [String]) -> [URL] {
+        paths
+            .map(URL.init(fileURLWithPath:))
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
     @discardableResult
     func saveActiveTab() -> Bool {
         guard let index = activeTabIndex else { return false }

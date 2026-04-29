@@ -851,3 +851,42 @@ private func flattenTitles(_ nodes: [StructuredPreviewNode]) -> [String] {
     #expect(snapshot.recentFilePaths == [recentURL.path])
     #expect(snapshot.workspaceRootPath == "/tmp")
 }
+
+@MainActor
+@Test func workspaceSyncSnapshotImportUpdatesPreferencesAndFiltersMissingPaths() throws {
+    let suiteName = "paperedit.sync.snapshot.import"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    let store = WorkspaceStore(defaults: defaults)
+
+    let existingFile = FileManager.default.temporaryDirectory
+        .appendingPathComponent("paperedit-existing-sync.json")
+    try "{}".write(to: existingFile, atomically: true, encoding: .utf8)
+
+    let missingFile = FileManager.default.temporaryDirectory
+        .appendingPathComponent("paperedit-missing-sync.json")
+
+    let snapshot = WorkspaceSyncSnapshot(
+        schemaVersion: WorkspaceSyncSnapshot.currentSchemaVersion,
+        updatedAt: Date(timeIntervalSince1970: 1_776_000_010),
+        themeMode: .dark,
+        accentSwatch: .purple,
+        sidebarMaterialStyle: .opaque,
+        sidebarSections: [.favorites],
+        editorFontSize: 22,
+        favoriteFilePaths: [existingFile.path, missingFile.path],
+        recentFilePaths: [existingFile.path, missingFile.path],
+        workspaceRootPath: FileManager.default.temporaryDirectory.path
+    )
+
+    store.applySyncSnapshot(snapshot)
+
+    #expect(store.themeMode == .dark)
+    #expect(store.accentSwatch == .purple)
+    #expect(store.sidebarMaterialStyle == .opaque)
+    #expect(store.sidebarSections == [.favorites])
+    #expect(store.editorFontSize == 22)
+    #expect(store.favoriteFileURLs == [existingFile])
+    #expect(store.recentFileURLs == [existingFile])
+    #expect(store.workspaceRootURL == FileManager.default.temporaryDirectory)
+}
