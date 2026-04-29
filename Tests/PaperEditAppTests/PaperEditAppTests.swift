@@ -119,6 +119,22 @@ import Testing
 }
 
 @MainActor
+@Test func openingUnavailableExternalFileDoesNotCreatePlaceholderTab() throws {
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let missingURL = tempDirectory.appendingPathComponent("missing.md")
+
+    let store = WorkspaceStore()
+    store.openExternalFiles([missingURL])
+
+    #expect(store.openTabs.isEmpty)
+    #expect(store.recentFileURLs.isEmpty)
+    #expect(store.openFailureMessage == "Unable to open missing.md. Check file permissions.")
+}
+
+@MainActor
 @Test func openingExternalDirectorySetsWorkspaceWithoutCreatingTab() throws {
     let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
@@ -242,6 +258,29 @@ import Testing
     let results = store.quickOpenItems()
     #expect(results.map { $0.sourceURL.resolvingSymlinksInPath().path } == [configURL.resolvingSymlinksInPath().path])
     #expect(results.first?.subtitle == "\(tempDirectory.lastPathComponent)/configs/prod")
+}
+
+@MainActor
+@Test func quickOpenIndexesFilesBeyondPreviousFourLevelLimit() throws {
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    var deepDirectory = tempDirectory
+    for component in ["one", "two", "three", "four", "five"] {
+        deepDirectory = deepDirectory.appendingPathComponent(component)
+    }
+    try FileManager.default.createDirectory(at: deepDirectory, withIntermediateDirectories: true)
+
+    let deepFile = deepDirectory.appendingPathComponent("deep-note.md")
+    try "# deep\n".write(to: deepFile, atomically: true, encoding: .utf8)
+
+    let store = WorkspaceStore()
+    store.workspaceRootURL = tempDirectory
+    store.openQuickOpen(prefill: "deep-note")
+
+    let results = store.quickOpenItems()
+    #expect(results.map { $0.sourceURL.resolvingSymlinksInPath().path } == [deepFile.resolvingSymlinksInPath().path])
 }
 
 @MainActor
@@ -424,6 +463,96 @@ import Testing
     #expect(store.saveActiveTab() == true)
     #expect(store.activeTab?.isDirty == false)
     #expect(try String(contentsOf: fileURL) == "name = \"paperedit-pro\"\n")
+}
+
+@MainActor
+@Test func normalSaveBlocksWhenDiskChangedAfterOpen() throws {
+    let suiteName = "PaperEditTests-\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+        Issue.record("Expected isolated defaults suite")
+        return
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let fileURL = tempDirectory.appendingPathComponent("sample.md")
+    try "# original\n".write(to: fileURL, atomically: true, encoding: .utf8)
+
+    let store = WorkspaceStore(defaults: defaults)
+    store.openExternalFiles([fileURL])
+    store.updateText("# local edit\n", selection: NSRange(location: 0, length: 0))
+
+    try "# external edit with different size\n".write(to: fileURL, atomically: true, encoding: .utf8)
+
+    #expect(store.saveActiveTab() == false)
+    #expect(store.activeTab?.conflictState.isBlockingSave == true)
+    #expect(try String(contentsOf: fileURL) == "# external edit with different size\n")
+
+    #expect(store.saveActiveTabIgnoringConflict() == true)
+    #expect(store.activeTab?.conflictState == FileConflictState.none)
+    #expect(try String(contentsOf: fileURL) == "# local edit\n")
+}
+
+@MainActor
+@Test func savedFileTabsRestoreFromSessionSnapshot() throws {
+    let suiteName = "PaperEditTests-\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+        Issue.record("Expected isolated defaults suite")
+        return
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let firstURL = tempDirectory.appendingPathComponent("first.md")
+    let secondURL = tempDirectory.appendingPathComponent("second.json")
+    try "# first\n".write(to: firstURL, atomically: true, encoding: .utf8)
+    try "{}".write(to: secondURL, atomically: true, encoding: .utf8)
+
+    let firstStore = WorkspaceStore(defaults: defaults)
+    firstStore.openExternalFiles([firstURL, secondURL])
+    firstStore.setActiveTab(firstStore.openTabs[0].id)
+
+    let restored = WorkspaceStore(defaults: defaults)
+    #expect(restored.openTabs.map(\.name) == ["first.md", "second.json"])
+    #expect(restored.activeTab?.name == "first.md")
+    #expect(restored.openTabs.allSatisfy { $0.isDirty == false })
+}
+
+@MainActor
+@Test func dirtyUntitledDraftsCanBeRecoveredFromLocalSnapshots() throws {
+    let suiteName = "PaperEditTests-\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+        Issue.record("Expected isolated defaults suite")
+        return
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let draftRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: draftRoot) }
+    let recoveryStore = DraftRecoveryStore(rootURL: draftRoot)
+
+    let firstStore = WorkspaceStore(defaults: defaults, draftRecoveryStore: recoveryStore)
+    firstStore.createUntitledTab()
+    firstStore.updateText("unsaved note", selection: NSRange(location: 0, length: 0))
+
+    let restored = WorkspaceStore(defaults: defaults, draftRecoveryStore: recoveryStore)
+    #expect(restored.pendingDraftRecovery.count == 1)
+    #expect(restored.recoveryMessage?.contains("unsaved draft") == true)
+
+    restored.recoverPendingDrafts()
+    #expect(restored.pendingDraftRecovery.isEmpty)
+    #expect(restored.activeTab?.text == "unsaved note")
+    #expect(restored.activeTab?.sourceURL == nil)
+    #expect(restored.activeTab?.isDirty == true)
 }
 
 @MainActor
@@ -689,4 +818,36 @@ private func flattenTitles(_ nodes: [StructuredPreviewNode]) -> [String] {
     nodes.flatMap { node in
         [node.title] + flattenTitles(node.children)
     }
+}
+
+@MainActor
+@Test func workspaceSyncSnapshotExportsPreferenceState() throws {
+    let defaults = UserDefaults(suiteName: "paperedit.sync.snapshot.export")!
+    defaults.removePersistentDomain(forName: "paperedit.sync.snapshot.export")
+    let store = WorkspaceStore(defaults: defaults)
+    let favoriteURL = URL(fileURLWithPath: "/tmp/paperedit-favorite.json")
+    let recentURL = URL(fileURLWithPath: "/tmp/paperedit-recent.md")
+
+    store.themeMode = .dark
+    store.accentSwatch = .green
+    store.sidebarMaterialStyle = .opaque
+    store.sidebarSections = [.favorites, .recent]
+    store.editorFontSize = 18
+    store.favoriteFileURLs = [favoriteURL]
+    store.recentFileURLs = [recentURL]
+    store.workspaceRootURL = URL(fileURLWithPath: "/tmp")
+
+    let updatedAt = Date(timeIntervalSince1970: 1_776_000_000)
+    let snapshot = store.makeSyncSnapshot(updatedAt: updatedAt)
+
+    #expect(snapshot.schemaVersion == 1)
+    #expect(snapshot.updatedAt == updatedAt)
+    #expect(snapshot.themeMode == .dark)
+    #expect(snapshot.accentSwatch == .green)
+    #expect(snapshot.sidebarMaterialStyle == .opaque)
+    #expect(snapshot.sidebarSections == [.favorites, .recent])
+    #expect(snapshot.editorFontSize == 18)
+    #expect(snapshot.favoriteFilePaths == [favoriteURL.path])
+    #expect(snapshot.recentFilePaths == [recentURL.path])
+    #expect(snapshot.workspaceRootPath == "/tmp")
 }

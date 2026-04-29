@@ -12,6 +12,7 @@ final class WorkspaceStore: ObservableObject {
         static let themeMode = "paperedit.theme-mode"
         static let sidebarMaterialStyle = "paperedit.sidebar-material-style"
         static let accentSwatch = "paperedit.accent-swatch"
+        static let sessionSnapshot = "paperedit.session-snapshot"
     }
 
     static let defaultEditorFontSize: CGFloat = 14
@@ -28,6 +29,8 @@ final class WorkspaceStore: ObservableObject {
     @Published var showCommandPalette = false
     @Published var showQuickOpen = false
     @Published var quickOpenErrorMessage: String?
+    @Published var quickOpenIndexMessage: String?
+    @Published var openFailureMessage: String?
     @Published var showSettings = false
     @Published var activeScene: DemoScene = .lightMarkdownSplit
     @Published var status = EditorStatus.empty
@@ -43,10 +46,13 @@ final class WorkspaceStore: ObservableObject {
     }
     @Published var favoriteFileURLs: [URL] = []
     @Published var recentFileURLs: [URL] = []
+    @Published var pendingDraftRecovery: [DraftSnapshot] = []
+    @Published var recoveryMessage: String?
 
     let commandPaletteModel = CommandPaletteModel()
     let quickOpenModel = QuickOpenModel()
     private let defaults: UserDefaults
+    private let draftRecoveryStore: DraftRecoveryStore
     private var workspaceFileIndex: [URL] = []
 
     private var untitledIndex = 1
@@ -55,6 +61,8 @@ final class WorkspaceStore: ObservableObject {
     private let minSidebarWidth: CGFloat = 200
     private let maxSidebarWidth: CGFloat = 320
     private let collapsedSidebarWidth: CGFloat = 0
+    private let quickOpenMaxDepth = 8
+    private let quickOpenMaxIndexedFiles = 2_000
 
     var favoriteFiles: [FileTreeNode] {
         favoriteFileURLs.compactMap { url in
@@ -100,8 +108,9 @@ final class WorkspaceStore: ObservableObject {
         openTabs.contains(where: \.isDirty)
     }
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, draftRecoveryStore: DraftRecoveryStore = DraftRecoveryStore()) {
         self.defaults = defaults
+        self.draftRecoveryStore = draftRecoveryStore
         restorePersistentState()
     }
 
@@ -171,6 +180,7 @@ final class WorkspaceStore: ObservableObject {
 
     func setActiveTab(_ tabID: EditorTab.ID) {
         activeTabID = tabID
+        persistState()
         refreshStatus()
     }
 
@@ -178,6 +188,9 @@ final class WorkspaceStore: ObservableObject {
         guard let index = openTabs.firstIndex(where: { $0.id == tabID }) else { return }
         guard confirmTabCloseIfNeeded(at: index) else { return }
 
+        if openTabs[index].sourceURL == nil {
+            draftRecoveryStore.delete(id: openTabs[index].id)
+        }
         openTabs.remove(at: index)
         if activeTabID == tabID {
             activeTabID = openTabs.indices.contains(index) ? openTabs[index].id : openTabs.last?.id
@@ -198,6 +211,7 @@ final class WorkspaceStore: ObservableObject {
 
     func openExternalFiles(_ urls: [URL]) {
         for url in urls {
+            openFailureMessage = nil
             if isDirectory(url) {
                 openExternalDirectory(url)
                 continue
@@ -208,25 +222,27 @@ final class WorkspaceStore: ObservableObject {
                 continue
             }
 
-            let text = (try? String(contentsOf: url)) ?? "// Unable to read \(url.lastPathComponent)"
-            let format = EditorFileFormat(fileURL: url, contents: text)
-            let tab = EditorTab(
-                name: url.lastPathComponent,
-                format: format,
-                text: text,
-                sourceURL: url,
-                isDirty: false,
-                selection: .init(location: 0, length: 0),
-                foldMarkers: format == .json ? [EditorFoldMarker(line: 1, level: 0, isFolded: false)] : [],
-                showsFolding: format == .json
-            )
+            guard FileManager.default.isReadableFile(atPath: url.path) else {
+                openFailureMessage = "Unable to open \(url.lastPathComponent). Check file permissions."
+                continue
+            }
+
+            let text: String
+            do {
+                text = try String(contentsOf: url)
+            } catch {
+                openFailureMessage = "Unable to open \(url.lastPathComponent). \(error.localizedDescription)"
+                continue
+            }
+
+            let tab = makeExternalTab(url: url, text: text)
             openTabs.append(tab)
             activeTabID = tab.id
             noteRecentFile(url)
             if workspaceRootURL == nil {
                 workspaceRootURL = url.deletingLastPathComponent()
             }
-            if format.supportsStructuredPreview {
+            if tab.format.supportsStructuredPreview {
                 viewMode = .split
             }
         }
@@ -357,6 +373,7 @@ final class WorkspaceStore: ObservableObject {
         openTabs[index].selection = selection
         if previousText != text {
             openTabs[index].isDirty = true
+            persistDraftRecoveryIfNeeded(for: openTabs[index])
         }
         refreshStatus()
     }
@@ -416,13 +433,96 @@ final class WorkspaceStore: ObservableObject {
         persistState()
     }
 
+    func makeSyncSnapshot(updatedAt: Date = Date()) -> WorkspaceSyncSnapshot {
+        WorkspaceSyncSnapshot(
+            schemaVersion: WorkspaceSyncSnapshot.currentSchemaVersion,
+            updatedAt: updatedAt,
+            themeMode: themeMode,
+            accentSwatch: accentSwatch,
+            sidebarMaterialStyle: sidebarMaterialStyle,
+            sidebarSections: SidebarSection.allCases.filter { sidebarSections.contains($0) },
+            editorFontSize: Double(editorFontSize),
+            favoriteFilePaths: favoriteFileURLs.map(\.path),
+            recentFilePaths: recentFileURLs.map(\.path),
+            workspaceRootPath: workspaceRootURL?.path
+        )
+    }
+
     @discardableResult
     func saveActiveTab() -> Bool {
+        guard let index = activeTabIndex else { return false }
+        if let existingURL = openTabs[index].sourceURL {
+            guard checkSaveConflict(at: index, url: existingURL) else {
+                refreshStatus()
+                return false
+            }
+            return saveTab(at: index, to: existingURL)
+        }
+        return saveActiveTabAs()
+    }
+
+    @discardableResult
+    func saveActiveTabIgnoringConflict() -> Bool {
         guard let index = activeTabIndex else { return false }
         if let existingURL = openTabs[index].sourceURL {
             return saveTab(at: index, to: existingURL)
         }
         return saveActiveTabAs()
+    }
+
+    func keepLocalVersionForActiveTab() {
+        guard let index = activeTabIndex else { return }
+        openTabs[index].conflictState = .none
+        refreshStatus()
+    }
+
+    func reloadActiveTabFromDisk() {
+        guard
+            let index = activeTabIndex,
+            let url = openTabs[index].sourceURL,
+            FileManager.default.isReadableFile(atPath: url.path),
+            let text = try? String(contentsOf: url)
+        else { return }
+
+        let format = EditorFileFormat(fileURL: url, contents: text)
+        openTabs[index].text = text
+        openTabs[index].format = format
+        openTabs[index].name = url.lastPathComponent
+        openTabs[index].isDirty = false
+        openTabs[index].fileBaseline = FileBaseline.current(for: url)
+        openTabs[index].conflictState = .none
+        persistState()
+        refreshStatus()
+    }
+
+    func recoverPendingDrafts() {
+        for snapshot in pendingDraftRecovery {
+            let tab = EditorTab(
+                id: snapshot.id,
+                name: snapshot.name,
+                format: snapshot.format,
+                text: snapshot.text,
+                isDirty: true,
+                selection: NSRange(location: 0, length: 0)
+            )
+            if !openTabs.contains(where: { $0.id == tab.id }) {
+                openTabs.append(tab)
+            }
+            draftRecoveryStore.delete(id: snapshot.id)
+        }
+        activeTabID = openTabs.last?.id ?? activeTabID
+        pendingDraftRecovery = []
+        recoveryMessage = nil
+        persistState()
+        refreshStatus()
+    }
+
+    func discardPendingDrafts() {
+        for snapshot in pendingDraftRecovery {
+            draftRecoveryStore.delete(id: snapshot.id)
+        }
+        pendingDraftRecovery = []
+        recoveryMessage = nil
     }
 
     @discardableResult
@@ -462,6 +562,7 @@ final class WorkspaceStore: ObservableObject {
         }
         showQuickOpen = true
         quickOpenErrorMessage = nil
+        quickOpenIndexMessage = nil
         quickOpenModel.reset()
         quickOpenModel.query = prefill
         refreshWorkspaceFileIndex()
@@ -470,6 +571,7 @@ final class WorkspaceStore: ObservableObject {
     func closeQuickOpen() {
         showQuickOpen = false
         quickOpenErrorMessage = nil
+        quickOpenIndexMessage = nil
         quickOpenModel.reset()
     }
 
@@ -636,6 +738,44 @@ final class WorkspaceStore: ObservableObject {
         return (try? String(contentsOf: item.sourceURL)) != nil
     }
 
+    private func makeExternalTab(url: URL, text: String) -> EditorTab {
+        let format = EditorFileFormat(fileURL: url, contents: text)
+        return EditorTab(
+            name: url.lastPathComponent,
+            format: format,
+            text: text,
+            sourceURL: url,
+            isDirty: false,
+            selection: .init(location: 0, length: 0),
+            foldMarkers: format == .json ? [EditorFoldMarker(line: 1, level: 0, isFolded: false)] : [],
+            showsFolding: format == .json,
+            fileBaseline: FileBaseline.current(for: url)
+        )
+    }
+
+    private func checkSaveConflict(at index: Int, url: URL) -> Bool {
+        guard let baseline = openTabs[index].fileBaseline else {
+            if FileBaseline.current(for: url) == nil {
+                openTabs[index].conflictState = .metadataUnavailable(path: url.path)
+                return false
+            }
+            return true
+        }
+
+        guard let current = FileBaseline.current(for: url) else {
+            openTabs[index].conflictState = .metadataUnavailable(path: url.path)
+            return false
+        }
+
+        guard current == baseline else {
+            openTabs[index].conflictState = .externallyModified(path: url.path)
+            return false
+        }
+
+        openTabs[index].conflictState = .none
+        return true
+    }
+
     @discardableResult
     private func saveTab(at index: Int, to url: URL) -> Bool {
         do {
@@ -644,6 +784,9 @@ final class WorkspaceStore: ObservableObject {
             openTabs[index].name = url.lastPathComponent
             openTabs[index].format = EditorFileFormat(fileURL: url, contents: openTabs[index].text)
             openTabs[index].isDirty = false
+            openTabs[index].fileBaseline = FileBaseline.current(for: url)
+            openTabs[index].conflictState = .none
+            draftRecoveryStore.delete(id: openTabs[index].id)
             noteRecentFile(url)
             if workspaceRootURL == nil {
                 workspaceRootURL = url.deletingLastPathComponent()
@@ -675,6 +818,7 @@ final class WorkspaceStore: ObservableObject {
         switch alert.runModal() {
         case .alertFirstButtonReturn:
             if let existingURL = openTabs[index].sourceURL {
+                guard checkSaveConflict(at: index, url: existingURL) else { return false }
                 return saveTab(at: index, to: existingURL)
             }
             guard let saveURL = presentSaveURL(for: openTabs[index]) else { return false }
@@ -706,6 +850,24 @@ final class WorkspaceStore: ObservableObject {
         NSDocumentController.shared.noteNewRecentDocumentURL(url)
     }
 
+    private func persistDraftRecoveryIfNeeded(for tab: EditorTab) {
+        guard tab.sourceURL == nil, tab.isDirty, !tab.text.isEmpty else {
+            if tab.sourceURL == nil {
+                draftRecoveryStore.delete(id: tab.id)
+            }
+            return
+        }
+
+        let snapshot = DraftSnapshot(
+            id: tab.id,
+            name: tab.name,
+            text: tab.text,
+            format: tab.format,
+            updatedAt: Date()
+        )
+        try? draftRecoveryStore.write(snapshot)
+    }
+
     private func isSameFileURL(_ lhs: URL?, _ rhs: URL) -> Bool {
         guard let lhs else { return false }
         return normalizedFilePath(for: lhs) == normalizedFilePath(for: rhs)
@@ -728,6 +890,7 @@ final class WorkspaceStore: ObservableObject {
         defaults.set(themeMode.rawValue, forKey: StorageKey.themeMode)
         defaults.set(sidebarMaterialStyle.rawValue, forKey: StorageKey.sidebarMaterialStyle)
         defaults.set(accentSwatch.rawValue, forKey: StorageKey.accentSwatch)
+        persistSessionSnapshot()
     }
 
     private func restorePersistentState() {
@@ -763,10 +926,77 @@ final class WorkspaceStore: ObservableObject {
         }
 
         activeScene = .emptyState
-        openTabs = []
-        activeTabID = nil
+        restoreSessionSnapshot()
+        pendingDraftRecovery = draftRecoveryStore.readSnapshots()
+        if !pendingDraftRecovery.isEmpty {
+            recoveryMessage = "\(pendingDraftRecovery.count) unsaved draft\(pendingDraftRecovery.count == 1 ? "" : "s") can be recovered. Drafts are stored locally on this Mac."
+        }
         refreshWorkspaceFileIndex()
         refreshStatus()
+    }
+
+    private func persistSessionSnapshot() {
+        let tabs = openTabs.compactMap { tab -> SessionTabSnapshot? in
+            guard let url = tab.sourceURL else { return nil }
+            return SessionTabSnapshot(
+                path: url.path,
+                selectionLocation: tab.selection.location,
+                selectionLength: tab.selection.length
+            )
+        }
+        guard !tabs.isEmpty else {
+            defaults.removeObject(forKey: StorageKey.sessionSnapshot)
+            return
+        }
+
+        let activePath = activeTab?.sourceURL?.path
+        let snapshot = SessionSnapshot(tabs: tabs, activePath: activePath)
+        if let data = try? JSONEncoder().encode(snapshot) {
+            defaults.set(data, forKey: StorageKey.sessionSnapshot)
+        }
+    }
+
+    private func restoreSessionSnapshot() {
+        openTabs = []
+        activeTabID = nil
+
+        guard
+            let data = defaults.data(forKey: StorageKey.sessionSnapshot),
+            let snapshot = try? JSONDecoder().decode(SessionSnapshot.self, from: data),
+            snapshot.schemaVersion == 1
+        else {
+            return
+        }
+
+        for tabSnapshot in snapshot.tabs {
+            let url = URL(fileURLWithPath: tabSnapshot.path)
+            guard
+                url.isFileURL,
+                !isDirectory(url),
+                FileManager.default.isReadableFile(atPath: url.path),
+                let text = try? String(contentsOf: url)
+            else {
+                continue
+            }
+
+            var tab = makeExternalTab(url: url, text: text)
+            let nsText = text as NSString
+            let location = min(max(0, tabSnapshot.selectionLocation), nsText.length)
+            let length = min(max(0, tabSnapshot.selectionLength), nsText.length - location)
+            tab.selection = NSRange(location: location, length: length)
+            openTabs.append(tab)
+        }
+
+        if let activePath = snapshot.activePath,
+           let active = openTabs.first(where: { $0.sourceURL?.path == activePath }) {
+            activeTabID = active.id
+        } else {
+            activeTabID = openTabs.first?.id
+        }
+
+        if openTabs.contains(where: { $0.format.supportsStructuredPreview }) {
+            viewMode = .split
+        }
     }
 
     private func buildWorkspaceNode(for url: URL) -> FileTreeNode {
@@ -786,6 +1016,7 @@ final class WorkspaceStore: ObservableObject {
     private func refreshWorkspaceFileIndex() {
         guard workspaceRootURL != nil else {
             workspaceFileIndex = []
+            quickOpenIndexMessage = nil
             return
         }
 
@@ -793,7 +1024,35 @@ final class WorkspaceStore: ObservableObject {
     }
 
     private func collectWorkspaceFileURLs(in directoryURL: URL, depth: Int) -> [URL] {
-        guard depth < 4 else { return [] }
+        var results: [URL] = []
+        var skippedDirectories = 0
+        collectWorkspaceFileURLs(
+            in: directoryURL,
+            depth: depth,
+            results: &results,
+            skippedDirectories: &skippedDirectories
+        )
+        if results.count >= quickOpenMaxIndexedFiles {
+            quickOpenIndexMessage = "Quick Open is showing the first \(quickOpenMaxIndexedFiles) files. Narrow your search or open a deeper folder."
+        } else if skippedDirectories > 0 {
+            quickOpenIndexMessage = "Quick Open skips heavy folders and searches up to \(quickOpenMaxDepth) levels deep."
+        } else {
+            quickOpenIndexMessage = nil
+        }
+        return results
+    }
+
+    private func collectWorkspaceFileURLs(
+        in directoryURL: URL,
+        depth: Int,
+        results: inout [URL],
+        skippedDirectories: inout Int
+    ) {
+        guard results.count < quickOpenMaxIndexedFiles else { return }
+        guard depth < quickOpenMaxDepth else {
+            skippedDirectories += 1
+            return
+        }
 
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .isRegularFileKey, .isHiddenKey]
         guard let urls = try? FileManager.default.contentsOfDirectory(
@@ -801,21 +1060,25 @@ final class WorkspaceStore: ObservableObject {
             includingPropertiesForKeys: Array(keys),
             options: [.skipsHiddenFiles]
         ) else {
-            return []
+            return
         }
 
-        return urls
-            .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
-            .flatMap { url -> [URL] in
-                guard let values = try? url.resourceValues(forKeys: keys), values.isHidden != true else { return [] }
-                if values.isDirectory == true {
-                    guard ![".git", ".build", "node_modules", ".swiftpm", "DerivedData"].contains(url.lastPathComponent) else {
-                        return []
-                    }
-                    return collectWorkspaceFileURLs(in: url, depth: depth + 1)
+        let sortedURLs = urls.sorted { lhs, rhs in
+            lhs.lastPathComponent.localizedCaseInsensitiveCompare(rhs.lastPathComponent) == .orderedAscending
+        }
+        for url in sortedURLs {
+            guard results.count < quickOpenMaxIndexedFiles else { return }
+            guard let values = try? url.resourceValues(forKeys: keys), values.isHidden != true else { continue }
+            if values.isDirectory == true {
+                guard ![".git", ".build", "node_modules", ".swiftpm", "DerivedData"].contains(url.lastPathComponent) else {
+                    skippedDirectories += 1
+                    continue
                 }
-                return values.isRegularFile == true ? [url] : []
+                collectWorkspaceFileURLs(in: url, depth: depth + 1, results: &results, skippedDirectories: &skippedDirectories)
+            } else if values.isRegularFile == true {
+                results.append(url)
             }
+        }
     }
 
     private func buildChildren(for directoryURL: URL, depth: Int) -> [FileTreeNode] {
@@ -889,9 +1152,7 @@ final class WorkspaceStore: ObservableObject {
             encoding: "UTF-8",
             line: line,
             column: column,
-            metrics: metricValue,
-            gitBranch: "main",
-            lspOnline: true
+            metrics: metricValue
         )
     }
 
