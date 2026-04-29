@@ -1,3 +1,4 @@
+import CloudKit
 import Foundation
 import Testing
 @testable import PaperEditApp
@@ -989,4 +990,156 @@ private enum FakeSyncError: Error {
     #expect(client.savedSnapshots.count == 1)
     #expect(client.savedSnapshots.first?.themeMode == .dark)
     #expect(syncStore.status == .synced)
+}
+
+@MainActor
+@Test func cloudSyncRecoversFromDecodeFailureBySavingFreshLocal() async throws {
+    final class DecodeFailingClient: CloudPreferencesClient, @unchecked Sendable {
+        var savedSnapshots: [WorkspaceSyncSnapshot] = []
+        func accountStatus() async throws -> CloudAccountStatus { .available }
+        func fetchSnapshot() async throws -> WorkspaceSyncSnapshot? {
+            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "test"))
+        }
+        func saveSnapshot(_ snapshot: WorkspaceSyncSnapshot) async throws {
+            savedSnapshots.append(snapshot)
+        }
+    }
+
+    let defaults = UserDefaults(suiteName: "paperedit.sync.decode-failure")!
+    defaults.removePersistentDomain(forName: "paperedit.sync.decode-failure")
+    let store = WorkspaceStore(defaults: defaults)
+
+    let client = DecodeFailingClient()
+    let syncStore = CloudSyncStore(client: client, clock: { Date(timeIntervalSince1970: 1_776_000_000) })
+    await syncStore.syncNow(workspaceStore: store)
+
+    #expect(client.savedSnapshots.count == 1, "Should re-upload local snapshot on decode failure")
+    #expect(syncStore.status == .synced, "User-visible status stays synced (silent recovery)")
+}
+
+@MainActor
+@Test func cloudSyncMapsNetworkCKErrorToRetryableMessage() async throws {
+    final class NetworkErrorClient: CloudPreferencesClient, @unchecked Sendable {
+        func accountStatus() async throws -> CloudAccountStatus { .available }
+        func fetchSnapshot() async throws -> WorkspaceSyncSnapshot? {
+            throw CKError(.networkUnavailable)
+        }
+        func saveSnapshot(_ snapshot: WorkspaceSyncSnapshot) async throws {}
+    }
+
+    let defaults = UserDefaults(suiteName: "paperedit.sync.network-error")!
+    defaults.removePersistentDomain(forName: "paperedit.sync.network-error")
+    let store = WorkspaceStore(defaults: defaults)
+
+    let syncStore = CloudSyncStore(client: NetworkErrorClient(), clock: { Date() })
+    await syncStore.syncNow(workspaceStore: store)
+
+    #expect(syncStore.status == .failed("Couldn't reach iCloud. Try again."))
+}
+
+@MainActor
+@Test func cloudSyncMapsQuotaCKErrorToFullStorageMessage() async throws {
+    final class QuotaErrorClient: CloudPreferencesClient, @unchecked Sendable {
+        func accountStatus() async throws -> CloudAccountStatus { .available }
+        func fetchSnapshot() async throws -> WorkspaceSyncSnapshot? {
+            throw CKError(.quotaExceeded)
+        }
+        func saveSnapshot(_ snapshot: WorkspaceSyncSnapshot) async throws {}
+    }
+
+    let defaults = UserDefaults(suiteName: "paperedit.sync.quota-error")!
+    defaults.removePersistentDomain(forName: "paperedit.sync.quota-error")
+    let store = WorkspaceStore(defaults: defaults)
+
+    let syncStore = CloudSyncStore(client: QuotaErrorClient(), clock: { Date() })
+    await syncStore.syncNow(workspaceStore: store)
+
+    #expect(syncStore.status == .failed("iCloud storage is full."))
+}
+
+@MainActor
+@Test func cloudSyncMapsAuthCKErrorToUserActionRequired() async throws {
+    final class AuthErrorClient: CloudPreferencesClient, @unchecked Sendable {
+        func accountStatus() async throws -> CloudAccountStatus { .available }
+        func fetchSnapshot() async throws -> WorkspaceSyncSnapshot? {
+            throw CKError(.notAuthenticated)
+        }
+        func saveSnapshot(_ snapshot: WorkspaceSyncSnapshot) async throws {}
+    }
+
+    let defaults = UserDefaults(suiteName: "paperedit.sync.auth-error")!
+    defaults.removePersistentDomain(forName: "paperedit.sync.auth-error")
+    let store = WorkspaceStore(defaults: defaults)
+
+    let syncStore = CloudSyncStore(client: AuthErrorClient(), clock: { Date() })
+    await syncStore.syncNow(workspaceStore: store)
+
+    #expect(syncStore.status == .unavailable("Sign in to iCloud to sync"))
+}
+
+@MainActor
+@Test func cloudSyncLaunchSyncIfNeededOnlyFiresOncePerInstance() async throws {
+    final class CountingClient: CloudPreferencesClient, @unchecked Sendable {
+        var fetchCount = 0
+        func accountStatus() async throws -> CloudAccountStatus { .available }
+        func fetchSnapshot() async throws -> WorkspaceSyncSnapshot? {
+            fetchCount += 1
+            return nil
+        }
+        func saveSnapshot(_ snapshot: WorkspaceSyncSnapshot) async throws {}
+    }
+
+    let defaults = UserDefaults(suiteName: "paperedit.sync.launch-once")!
+    defaults.removePersistentDomain(forName: "paperedit.sync.launch-once")
+    let store = WorkspaceStore(defaults: defaults)
+
+    let client = CountingClient()
+    let syncStore = CloudSyncStore(client: client, clock: { Date() })
+
+    await syncStore.launchSyncIfNeeded(workspaceStore: store)
+    await syncStore.launchSyncIfNeeded(workspaceStore: store)
+    await syncStore.launchSyncIfNeeded(workspaceStore: store)
+
+    #expect(client.fetchCount == 1, "didLaunchSync guard should suppress re-entries")
+}
+
+@MainActor
+@Test func iCloudSyncEnabledPersistsAcrossWorkspaceStoreReloads() throws {
+    let suiteName = "paperedit.sync.toggle-persist"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+
+    let firstStore = WorkspaceStore(defaults: defaults)
+    #expect(firstStore.iCloudSyncEnabled == false, "Default is opt-in (false)")
+
+    firstStore.setICloudSyncEnabled(true)
+
+    let secondStore = WorkspaceStore(defaults: defaults)
+    #expect(secondStore.iCloudSyncEnabled == true, "Toggle persists across reloads")
+}
+
+@MainActor
+@Test func applySyncSnapshotIgnoresUnknownSchemaVersion() throws {
+    let suiteName = "paperedit.sync.unknown-schema"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    let store = WorkspaceStore(defaults: defaults)
+
+    let originalTheme = store.themeMode
+    let futureSnapshot = WorkspaceSyncSnapshot(
+        schemaVersion: WorkspaceSyncSnapshot.currentSchemaVersion + 1,
+        updatedAt: Date(),
+        themeMode: .dark,
+        accentSwatch: .purple,
+        sidebarMaterialStyle: .opaque,
+        sidebarSections: [],
+        editorFontSize: 22,
+        favoriteFilePaths: [],
+        recentFilePaths: [],
+        workspaceRootPath: nil
+    )
+
+    store.applySyncSnapshot(futureSnapshot)
+
+    #expect(store.themeMode == originalTheme, "Unknown future schema must not mutate local state")
 }
