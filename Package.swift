@@ -14,6 +14,9 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "PaperEditApp",
+            exclude: [
+                "App/PaperEditApp.entitlements",
+            ],
             swiftSettings: [
                 .unsafeFlags(["-F", "ThirdParty"]),
             ],
