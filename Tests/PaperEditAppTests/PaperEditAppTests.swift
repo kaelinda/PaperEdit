@@ -890,3 +890,103 @@ private func flattenTitles(_ nodes: [StructuredPreviewNode]) -> [String] {
     #expect(store.recentFileURLs == [existingFile])
     #expect(store.workspaceRootURL == FileManager.default.temporaryDirectory)
 }
+
+private final class FakeCloudPreferencesClient: CloudPreferencesClient, @unchecked Sendable {
+    var remoteSnapshot: WorkspaceSyncSnapshot?
+    var savedSnapshots: [WorkspaceSyncSnapshot] = []
+    var fetchError: Error?
+    var accountState: CloudAccountStatus = .available
+
+    func accountStatus() async throws -> CloudAccountStatus {
+        accountState
+    }
+
+    func fetchSnapshot() async throws -> WorkspaceSyncSnapshot? {
+        if let fetchError { throw fetchError }
+        return remoteSnapshot
+    }
+
+    func saveSnapshot(_ snapshot: WorkspaceSyncSnapshot) async throws {
+        savedSnapshots.append(snapshot)
+        remoteSnapshot = snapshot
+    }
+}
+
+private enum FakeSyncError: Error {
+    case unavailable
+}
+
+@MainActor
+@Test func cloudSyncSurfacesNoAccountStateInsteadOfAttemptingFetch() async throws {
+    let defaults = UserDefaults(suiteName: "paperedit.sync.no-account")!
+    defaults.removePersistentDomain(forName: "paperedit.sync.no-account")
+    let store = WorkspaceStore(defaults: defaults)
+
+    let client = FakeCloudPreferencesClient()
+    client.accountState = .noAccount
+
+    let syncStore = CloudSyncStore(client: client, clock: { Date() })
+    await syncStore.syncNow(workspaceStore: store)
+
+    #expect(client.savedSnapshots.isEmpty)
+    #expect(syncStore.status == .unavailable("Sign in to iCloud to sync"))
+}
+
+@MainActor
+@Test func cloudSyncAppliesNewerRemoteSnapshot() async throws {
+    let defaults = UserDefaults(suiteName: "paperedit.sync.remote-newer")!
+    defaults.removePersistentDomain(forName: "paperedit.sync.remote-newer")
+    let store = WorkspaceStore(defaults: defaults)
+    store.themeMode = .light
+
+    let remote = WorkspaceSyncSnapshot(
+        schemaVersion: WorkspaceSyncSnapshot.currentSchemaVersion,
+        updatedAt: Date(timeIntervalSince1970: 1_776_000_020),
+        themeMode: .dark,
+        accentSwatch: .blue,
+        sidebarMaterialStyle: .translucent,
+        sidebarSections: SidebarSection.allCases,
+        editorFontSize: 19,
+        favoriteFilePaths: [],
+        recentFilePaths: [],
+        workspaceRootPath: nil
+    )
+    let client = FakeCloudPreferencesClient()
+    client.remoteSnapshot = remote
+
+    let syncStore = CloudSyncStore(client: client, clock: { Date(timeIntervalSince1970: 1_776_000_000) })
+    await syncStore.syncNow(workspaceStore: store)
+
+    #expect(store.themeMode == .dark)
+    #expect(client.savedSnapshots.isEmpty)
+    #expect(syncStore.status == .synced)
+}
+
+@MainActor
+@Test func cloudSyncUploadsLocalSnapshotWhenRemoteIsOlder() async throws {
+    let defaults = UserDefaults(suiteName: "paperedit.sync.local-newer")!
+    defaults.removePersistentDomain(forName: "paperedit.sync.local-newer")
+    let store = WorkspaceStore(defaults: defaults)
+    store.themeMode = .dark
+
+    let client = FakeCloudPreferencesClient()
+    client.remoteSnapshot = WorkspaceSyncSnapshot(
+        schemaVersion: WorkspaceSyncSnapshot.currentSchemaVersion,
+        updatedAt: Date(timeIntervalSince1970: 1_776_000_000),
+        themeMode: .light,
+        accentSwatch: .blue,
+        sidebarMaterialStyle: .translucent,
+        sidebarSections: SidebarSection.allCases,
+        editorFontSize: 14,
+        favoriteFilePaths: [],
+        recentFilePaths: [],
+        workspaceRootPath: nil
+    )
+
+    let syncStore = CloudSyncStore(client: client, clock: { Date(timeIntervalSince1970: 1_776_000_030) })
+    await syncStore.syncNow(workspaceStore: store)
+
+    #expect(client.savedSnapshots.count == 1)
+    #expect(client.savedSnapshots.first?.themeMode == .dark)
+    #expect(syncStore.status == .synced)
+}

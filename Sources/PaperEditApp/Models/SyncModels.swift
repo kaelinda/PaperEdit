@@ -33,7 +33,7 @@ enum CloudAccountStatus: Equatable {
     case couldNotDetermine(String)
 }
 
-protocol CloudPreferencesClient {
+protocol CloudPreferencesClient: Sendable {
     /// Returns the current iCloud account state. Called before every sync attempt
     /// so the UI can surface `Sign in to iCloud to sync` instead of a CloudKit error.
     func accountStatus() async throws -> CloudAccountStatus

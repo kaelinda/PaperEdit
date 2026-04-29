@@ -19,6 +19,7 @@ let package = Package(
             ],
             linkerSettings: [
                 .unsafeFlags(["-F", "ThirdParty", "-framework", "Sparkle", "-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"]),
+                .linkedFramework("CloudKit"),
             ]
         ),
         .executableTarget(
@@ -29,6 +30,9 @@ let package = Package(
             dependencies: ["PaperEditApp"],
             swiftSettings: [
                 .unsafeFlags(["-F", "ThirdParty"]),
+            ],
+            linkerSettings: [
+                .linkedFramework("CloudKit"),
             ]
         ),
     ],
