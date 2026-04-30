@@ -168,7 +168,7 @@ struct StructuredPreviewContainer: View {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#B86B00"))
+                    .foregroundStyle(theme.warning)
 
                 Text("\(tab.format.displayName) validation")
                     .font(.system(size: 12, weight: .semibold))
@@ -193,10 +193,10 @@ struct StructuredPreviewContainer: View {
             }
         }
         .padding(12)
-        .background(Color(hex: "#FFCC00").opacity(isDark ? 0.12 : 0.16), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(theme.warning.opacity(isDark ? 0.12 : 0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color(hex: "#B86B00").opacity(0.25), lineWidth: 1)
+                .stroke(theme.warning.opacity(isDark ? 0.22 : 0.28), lineWidth: 1)
         )
     }
 
@@ -249,7 +249,7 @@ struct StructuredPreviewContainer: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#B86B00"))
+                        .foregroundStyle(theme.warning)
                     Text(message)
                         .font(.system(size: 12))
                         .foregroundStyle(theme.textMuted)
@@ -258,21 +258,24 @@ struct StructuredPreviewContainer: View {
             }
         }
         .padding(12)
-        .background(Color(hex: "#FFCC00").opacity(isDark ? 0.12 : 0.16), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(theme.warning.opacity(isDark ? 0.12 : 0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color(hex: "#B86B00").opacity(0.25), lineWidth: 1)
+                .stroke(theme.warning.opacity(isDark ? 0.22 : 0.28), lineWidth: 1)
         )
     }
 }
 
 private struct StructuredPreviewNodeRow: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let node: StructuredPreviewNode
     let depth: Int
     let theme: PaperTheme
     @State private var isExpanded = true
 
-    private let expansionAnimation = Animation.spring(response: 0.28, dampingFraction: 0.82, blendDuration: 0.12)
+    private var expansionAnimation: Animation {
+        reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.28, dampingFraction: 0.82, blendDuration: 0.12)
+    }
 
     private var hasChildren: Bool {
         !node.children.isEmpty
@@ -294,11 +297,12 @@ private struct StructuredPreviewNodeRow: View {
                     Image(systemName: hasChildren ? "chevron.right" : "circle.fill")
                         .font(.system(size: hasChildren ? 10 : 4, weight: .bold))
                         .rotationEffect(.degrees(isExpanded && hasChildren ? 90 : 0))
-                        .frame(width: 14, height: 14)
+                        .frame(width: 28, height: 28)
                         .foregroundStyle(hasChildren ? theme.textSubtle : theme.border)
                 }
                 .buttonStyle(.plain)
                 .disabled(!hasChildren)
+                .accessibilityLabel(hasChildren ? "\(node.title) disclosure" : node.title)
 
                 Image(systemName: node.kind.iconName)
                     .font(.system(size: 12, weight: .semibold))
@@ -346,12 +350,10 @@ private struct StructuredPreviewNodeRow: View {
                         StructuredPreviewNodeRow(node: child, depth: depth + 1, theme: theme)
                     }
                 }
-                .transition(
-                    .asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.985, anchor: .top)),
-                        removal: .opacity.combined(with: .scale(scale: 0.985, anchor: .top))
-                    )
-                )
+                .transition(reduceMotion ? .opacity : .asymmetric(
+                    insertion: .opacity.combined(with: .scale(scale: 0.985, anchor: .top)),
+                    removal: .opacity.combined(with: .scale(scale: 0.985, anchor: .top))
+                ))
             }
         }
     }
@@ -361,9 +363,9 @@ private struct StructuredPreviewNodeRow: View {
         case .root, .section:
             theme.accent
         case .object, .array, .element:
-            Color(hex: "#248A3D")
+            theme.success
         case .attribute, .property:
-            Color(hex: "#B86B00")
+            theme.warning
         case .item, .value:
             theme.textSubtle
         }

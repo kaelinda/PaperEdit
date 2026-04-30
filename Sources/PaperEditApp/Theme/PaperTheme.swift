@@ -23,6 +23,7 @@ struct PaperTheme {
     var selection: Color
     var paletteBlur: Color
     var success: Color
+    var warning: Color
     var danger: Color
     var shadow: Color
 
@@ -49,6 +50,7 @@ struct PaperTheme {
         selection: AccentSwatch.blue.interfaceColor.opacity(0.14),
         paletteBlur: Color.white.opacity(0.9),
         success: Color(hex: "#248A3D"),
+        warning: Color(hex: "#B86B00"),
         danger: Color(hex: "#D70015"),
         shadow: Color.black.opacity(0.08)
     )
@@ -76,6 +78,7 @@ struct PaperTheme {
         selection: AccentSwatch.blue.interfaceColor.opacity(0.24),
         paletteBlur: Color(hex: "#1D1D1D").opacity(0.95),
         success: Color(hex: "#32D74B"),
+        warning: Color(hex: "#FFD60A"),
         danger: Color(hex: "#FF453A"),
         shadow: Color.black.opacity(0.28)
     )
@@ -115,6 +118,7 @@ extension PaperTheme {
             selection: accentSwatch.interfaceColor.opacity(palette == .dark || (palette == .system && colorScheme == .dark) ? 0.24 : 0.14),
             paletteBlur: base.paletteBlur,
             success: base.success,
+            warning: base.warning,
             danger: base.danger,
             shadow: base.shadow
         )
@@ -133,7 +137,7 @@ extension AccentSwatch {
         case .red:
             Color(hex: "#C9342C")
         case .green:
-            Color(hex: "#248A3D")
+            Color(hex: "#1F7A2F")
         case .orange:
             Color(hex: "#B86B00")
         case .purple:
@@ -143,9 +147,9 @@ extension AccentSwatch {
 
     var foregroundColor: Color {
         switch self {
-        case .orange, .green:
+        case .orange:
             Color(hex: "#111214")
-        case .blue, .red, .purple:
+        case .blue, .red, .green, .purple:
             Color.white
         }
     }

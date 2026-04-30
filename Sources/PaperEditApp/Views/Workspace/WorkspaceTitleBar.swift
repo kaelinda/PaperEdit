@@ -2,25 +2,25 @@ import SwiftUI
 
 struct WorkspaceTitleBar: View {
     @EnvironmentObject private var workspaceStore: WorkspaceStore
+    @EnvironmentObject private var settingsModel: SettingsWindowModel
 
     let theme: PaperTheme
     let isCompactWidth: Bool
     let topInset: CGFloat
-    private let horizontalInset: CGFloat = 16
-    private let titlebarContentHeight: CGFloat = 48
+    private let horizontalInset: CGFloat = 18
+    private let titlebarContentHeight: CGFloat = 46
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            ZStack {
-                VisualEffectBlur(material: .headerView)
-                theme.chromeBackground
-            }
+            LiquidGlassChrome(theme: theme)
 
             VStack(spacing: 0) {
-                Spacer(minLength: max(0, topInset - 8))
+                Spacer(minLength: titlebarTopPadding)
 
-                HStack(spacing: 14) {
+                HStack(spacing: isCompactWidth ? 8 : 12) {
                     leftCluster
+                        .layoutPriority(3)
+                        .fixedSize(horizontal: true, vertical: false)
 
                     if !isCompactWidth {
                         HairlineDivider(theme: theme)
@@ -37,6 +37,8 @@ struct WorkspaceTitleBar: View {
                     Spacer(minLength: 12)
 
                     rightCluster
+                        .layoutPriority(3)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .padding(.horizontal, horizontalInset)
                 .frame(height: titlebarContentHeight)
@@ -46,57 +48,41 @@ struct WorkspaceTitleBar: View {
                 .fill(theme.border)
                 .frame(height: 1)
         }
-        .frame(height: titlebarContentHeight + max(0, topInset - 8))
+        .frame(height: titlebarContentHeight + titlebarTopPadding)
+    }
+
+    private var titlebarTopPadding: CGFloat {
+        guard topInset > 0 else { return 8 }
+        return max(18, min(24, topInset - 54))
     }
 
     private var leftCluster: some View {
-        HStack(spacing: 8) {
-            Menu {
-                Button("New File") { workspaceStore.createUntitledTab() }
-                Button("Open File...") { workspaceStore.presentOpenPanel() }
-                Button("Open Folder...") { workspaceStore.presentOpenFolderPanel() }
-            } label: {
-                HStack(spacing: 8) {
-                    ZStack {
-                        Circle()
-                            .fill(theme.accent.opacity(0.14))
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(theme.accent)
-                    }
-                    .frame(width: 24, height: 24)
+        HStack(spacing: isCompactWidth ? 6 : 10) {
+            HStack(spacing: isCompactWidth ? 0 : 9) {
+                AppLogoMark(theme: theme)
+                    .frame(width: 30, height: 30)
 
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("PaperEdit")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(theme.textPrimary)
-                        Text(workspaceCaption)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(theme.textSubtle)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                    .frame(minWidth: 0, alignment: .leading)
-
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(theme.textSubtle)
+                if !isCompactWidth {
+                    Text("PaperEdit")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(theme.textPrimary)
                 }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 6)
-                .background(toolbarCapsuleBackground)
             }
-            .menuStyle(.borderlessButton)
-            .help("PaperEdit menu")
+            .padding(.horizontal, isCompactWidth ? 4 : 7)
+            .frame(height: 36)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("PaperEdit")
+            .accessibilityValue(workspaceCaption)
+            .help("Current workspace")
 
-            HStack(spacing: 4) {
+            HStack(spacing: 1) {
                 Menu {
                     Button("New File") { workspaceStore.createUntitledTab() }
                     Divider()
                     Button("Open File...") { workspaceStore.presentOpenPanel() }
                     Button("Open Folder...") { workspaceStore.presentOpenFolderPanel() }
                 } label: {
-                    ToolbarActionLabel(symbol: "folder", title: "Open", theme: theme, trailingSymbol: "chevron.down")
+                    ToolbarActionLabel(symbol: "folder", title: "Open", theme: theme, trailingSymbol: "chevron.down", compact: isCompactWidth)
                 }
                 .menuStyle(.borderlessButton)
                 .help("Open a file or folder")
@@ -104,7 +90,7 @@ struct WorkspaceTitleBar: View {
                 Button {
                     workspaceStore.openQuickOpen()
                 } label: {
-                    ToolbarActionLabel(symbol: "magnifyingglass", title: "Find", theme: theme, shortcut: "⌘P")
+                    ToolbarActionLabel(symbol: "magnifyingglass", title: "Find", theme: theme, shortcut: "⌘P", compact: isCompactWidth)
                 }
                 .buttonStyle(.plain)
                 .help("Find a file in the current workspace")
@@ -112,12 +98,14 @@ struct WorkspaceTitleBar: View {
                 Button {
                     _ = workspaceStore.saveActiveTab()
                 } label: {
-                    ToolbarActionLabel(symbol: "square.and.arrow.down", title: "Save", theme: theme)
+                    ToolbarActionLabel(symbol: "square.and.arrow.down", title: "Save", theme: theme, compact: isCompactWidth)
                 }
                 .buttonStyle(.plain)
                 .disabled(workspaceStore.activeTab == nil)
                 .help("Save current file")
             }
+            .padding(3)
+            .background(toolbarSurface(cornerRadius: 10))
         }
     }
 
@@ -135,7 +123,7 @@ struct WorkspaceTitleBar: View {
 
     private var tabsStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 ForEach(workspaceStore.openTabs) { tab in
                     TabItemView(tab: tab, theme: theme, isActive: workspaceStore.activeTabID == tab.id)
                 }
@@ -146,32 +134,35 @@ struct WorkspaceTitleBar: View {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(theme.textMuted)
-                        .frame(width: 28, height: 28)
-                        .background(theme.hover, in: Circle())
+                        .frame(width: 26, height: 26)
+                        .background(theme.hover, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .padding(.leading, 4)
+                .padding(.leading, 2)
                 .accessibilityLabel("New File")
             }
-            .padding(4)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 4)
         }
-        .frame(height: 40)
-        .background(toolbarCapsuleBackground)
+        .frame(minWidth: 230, idealWidth: 360, maxWidth: 520)
+        .frame(height: 36)
+        .background(toolbarSurface(cornerRadius: 11))
+        .layoutPriority(0)
     }
 
     private var rightCluster: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             if workspaceStore.previewModeAvailable {
-                HStack(spacing: 0) {
+                HStack(spacing: 1) {
                     modeButton(.edit, title: "编辑")
                     modeButton(.split, title: "分屏预览")
                     modeButton(.wysiwyg, title: "预览")
                 }
                 .padding(3)
-                .background(toolbarCapsuleBackground)
+                .background(toolbarSurface(cornerRadius: 10))
             }
 
-            HStack(spacing: 4) {
+            HStack(spacing: 2) {
                 ToolbarIconButton(
                     symbol: themeToggleSymbol,
                     theme: theme,
@@ -191,13 +182,20 @@ struct WorkspaceTitleBar: View {
                     workspaceStore.setViewMode(.split)
                 }
                 .accessibilityLabel("Show Split Preview")
+                ToolbarIconButton(symbol: "gearshape", theme: theme) {
+                    settingsModel.selectedPane = .appearance
+                    workspaceStore.showSettings = true
+                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                }
+                .accessibilityLabel("Open Settings")
+                .help("Open Settings")
                 ToolbarIconButton(symbol: "ellipsis", theme: theme) {
                     workspaceStore.openCommandPalette()
                 }
                 .accessibilityLabel("Open Command Palette")
             }
-            .padding(4)
-            .background(toolbarCapsuleBackground)
+            .padding(3)
+            .background(toolbarSurface(cornerRadius: 10))
         }
     }
 
@@ -220,29 +218,30 @@ struct WorkspaceTitleBar: View {
     }
 
     private func modeButton(_ mode: EditorViewMode, title: String) -> some View {
-        Button {
+        let isSelected = workspaceStore.viewMode == mode
+
+        return Button {
             workspaceStore.setViewMode(mode)
         } label: {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(workspaceStore.viewMode == mode ? theme.textPrimary : theme.textMuted)
+                .foregroundStyle(isSelected ? theme.textPrimary : theme.textMuted)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
-                .padding(.horizontal, 14)
-                .frame(height: 30)
+                .padding(.horizontal, 13)
+                .frame(minHeight: 34)
                 .background(
-                    Capsule(style: .continuous)
-                        .fill(workspaceStore.viewMode == mode ? theme.elevatedBackground : .clear)
-                        .shadow(
-                            color: workspaceStore.viewMode == mode ? theme.shadow.opacity(0.18) : .clear,
-                            radius: 10,
-                            y: 4
-                        )
+                    Group {
+                        if isSelected {
+                            LiquidGlassSurface(theme: theme, cornerRadius: 8, isProminent: true)
+                        }
+                    }
                 )
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
-        .accessibilityValue(workspaceStore.viewMode == mode ? "Selected" : "")
+        .accessibilityValue(isSelected ? "Selected" : "")
+        .fixedSize(horizontal: true, vertical: false)
     }
     private var workspaceCaption: String {
         if let url = workspaceStore.workspaceRootURL {
@@ -254,13 +253,54 @@ struct WorkspaceTitleBar: View {
         return "Document workspace"
     }
 
-    private var toolbarCapsuleBackground: some View {
-        Capsule(style: .continuous)
-            .fill(theme.secondaryElevatedBackground)
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(theme.border, lineWidth: 1)
-            )
+    private func toolbarSurface(cornerRadius: CGFloat) -> some View {
+        LiquidGlassSurface(theme: theme, cornerRadius: cornerRadius)
+    }
+}
+
+private struct AppLogoMark: View {
+    let theme: PaperTheme
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.96), Color(hex: "#E9ECF4")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(Color.white.opacity(0.9), lineWidth: 1)
+                )
+                .shadow(color: theme.shadow.opacity(0.18), radius: 4, y: 2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 3) {
+                    Capsule().fill(theme.accent).frame(width: 11, height: 2.5)
+                    Capsule().fill(Color(hex: "#D9DCE3")).frame(width: 5, height: 2.5)
+                }
+                Capsule().fill(Color(hex: "#FFCC11")).frame(width: 17, height: 2.5)
+                HStack(spacing: 3) {
+                    Capsule().fill(Color(hex: "#B24EE7")).frame(width: 13, height: 2.5)
+                    Capsule().fill(Color(hex: "#D9DCE3")).frame(width: 5, height: 2.5)
+                }
+                Capsule().fill(Color(hex: "#36D344")).frame(width: 19, height: 2.5)
+                HStack(spacing: 3) {
+                    Capsule().fill(Color(hex: "#FF930F")).frame(width: 9, height: 2.5)
+                    Capsule().fill(Color(hex: "#FF2D55")).frame(width: 8, height: 2.5)
+                }
+            }
+            .padding(.top, 1)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(theme.selectedItemFill)
+                .frame(width: 36, height: 36)
+        )
+        .accessibilityHidden(true)
     }
 }
 
@@ -271,14 +311,17 @@ private struct ToolbarIconButton: View {
     var accessibilityLabel: String?
     let action: () -> Void
     @State private var hovering = false
+    @FocusState private var focused: Bool
 
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .medium))
         }
-        .buttonStyle(ToolbarIconButtonStyle(theme: theme, hovering: hovering, isActive: isActive))
-        .contentShape(Circle())
+        .buttonStyle(ToolbarIconButtonStyle(theme: theme, hovering: hovering, focused: focused, isActive: isActive))
+        .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .focusable()
+        .focused($focused)
         .onHover { isHovering in
             withAnimation(.easeOut(duration: 0.14)) {
                 hovering = isHovering
@@ -292,23 +335,25 @@ private struct ToolbarIconButton: View {
 private struct ToolbarIconButtonStyle: ButtonStyle {
     let theme: PaperTheme
     let hovering: Bool
+    let focused: Bool
     let isActive: Bool
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .frame(width: 34, height: 34)
+            .frame(width: 36, height: 36)
             .foregroundStyle(foregroundColor)
             .background(
-                Circle()
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(backgroundColor(isPressed: configuration.isPressed))
             )
             .overlay(
-                Circle()
-                    .stroke(isActive ? theme.selectedItemStroke : .clear, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(focused ? theme.accent : isActive ? theme.selectedItemStroke : .clear, lineWidth: focused ? 2 : 1)
             )
-            .scaleEffect(configuration.isPressed ? 0.94 : hovering ? 1.035 : 1)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .animation(.spring(response: 0.18, dampingFraction: 0.78, blendDuration: 0.04), value: configuration.isPressed)
             .animation(.easeOut(duration: 0.14), value: hovering)
+            .animation(.easeOut(duration: 0.12), value: focused)
             .animation(.easeOut(duration: 0.18), value: isActive)
     }
 
@@ -316,7 +361,7 @@ private struct ToolbarIconButtonStyle: ButtonStyle {
         if isActive {
             return theme.accent
         }
-        return hovering ? theme.textPrimary : theme.textMuted
+        return hovering || focused ? theme.textPrimary : theme.textMuted
     }
 
     private func backgroundColor(isPressed: Bool) -> Color {
@@ -326,7 +371,7 @@ private struct ToolbarIconButtonStyle: ButtonStyle {
         if isActive {
             return theme.selectedItemFill
         }
-        return hovering ? theme.hover : .clear
+        return hovering || focused ? theme.hover : .clear
     }
 }
 
@@ -336,6 +381,7 @@ private struct ToolbarActionLabel: View {
     let theme: PaperTheme
     var trailingSymbol: String?
     var shortcut: String?
+    var compact = false
     @Environment(\.isEnabled) private var isEnabled
     @State private var hovering = false
 
@@ -345,16 +391,18 @@ private struct ToolbarActionLabel: View {
                 .font(.system(size: 12, weight: .semibold))
                 .frame(width: 14)
 
-            Text(title)
-                .font(.system(size: 12, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
+            if !compact {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
-            if let shortcut {
-                Text(shortcut)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(foregroundColor.opacity(0.66))
-                    .padding(.leading, 1)
+                if let shortcut {
+                    Text(shortcut)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(foregroundColor.opacity(0.66))
+                        .padding(.leading, 1)
+                }
             }
 
             if let trailingSymbol {
@@ -364,18 +412,15 @@ private struct ToolbarActionLabel: View {
             }
         }
         .foregroundStyle(foregroundColor)
-        .frame(height: 30)
-        .padding(.horizontal, 9)
+        .frame(minHeight: 34)
+        .padding(.horizontal, compact ? 7 : 9)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(hovering && isEnabled ? theme.hover : theme.secondaryElevatedBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(theme.border, lineWidth: 1)
+                .fill(hovering && isEnabled ? theme.hover : .clear)
         )
         .opacity(isEnabled ? 1 : 0.46)
         .onHover { hovering = $0 }
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     private var foregroundColor: Color {
@@ -407,12 +452,12 @@ private struct TabChip: View {
             }
         }
         .padding(.horizontal, 12)
-        .frame(height: 30)
+        .frame(height: 28)
         .background(
-            Capsule(style: .continuous)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(theme.elevatedBackground)
                 .overlay(
-                    Capsule(style: .continuous)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .stroke(theme.border, lineWidth: 1)
                 )
         )
@@ -422,6 +467,7 @@ private struct TabChip: View {
 private struct TabItemView: View {
     @EnvironmentObject private var workspaceStore: WorkspaceStore
     @State private var hovering = false
+    @FocusState private var focused: Bool
 
     let tab: EditorTab
     let theme: PaperTheme
@@ -449,30 +495,32 @@ private struct TabItemView: View {
                             .frame(width: 5, height: 5)
                     }
 
-                    Spacer(minLength: hovering || isActive ? 16 : 0)
+                    Spacer(minLength: hovering || isActive || focused ? 18 : 0)
                 }
                 .padding(.horizontal, 12)
-                .frame(minWidth: 118, maxWidth: 182, minHeight: 30, maxHeight: 30, alignment: .leading)
+                .frame(minWidth: 118, maxWidth: 182, minHeight: 34, maxHeight: 34, alignment: .leading)
                 .background(
-                    Capsule(style: .continuous)
-                        .fill(isActive ? theme.elevatedBackground : hovering ? theme.hover.opacity(0.72) : .clear)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(isActive ? theme.elevatedBackground : hovering || focused ? theme.hover.opacity(0.72) : .clear)
                 )
                 .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(isActive ? theme.borderStrong : .clear, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(focused ? theme.accent : isActive ? theme.borderStrong : .clear, lineWidth: focused ? 2 : 1)
                 )
-                .shadow(color: isActive ? theme.shadow.opacity(0.12) : .clear, radius: 10, y: 4)
+                .shadow(color: isActive ? theme.shadow.opacity(0.12) : .clear, radius: 8, y: 3)
             }
             .buttonStyle(.plain)
+            .focusable()
+            .focused($focused)
 
-            if hovering || isActive {
+            if hovering || isActive || focused {
                 Button {
                     workspaceStore.closeTab(tab.id)
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(theme.textMuted)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 26, height: 26)
                         .background(theme.hover, in: Circle())
                 }
                 .buttonStyle(.plain)

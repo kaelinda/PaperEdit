@@ -12,6 +12,7 @@ struct QuickOpenPanelView: View {
         VStack(spacing: 0) {
             queryRow(items: items)
             errorMessage
+            indexMessage
 
             ScrollView {
                 if items.isEmpty {
@@ -93,7 +94,7 @@ struct QuickOpenPanelView: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(theme.textSubtle)
-                    .frame(width: 20, height: 20)
+                    .frame(width: 30, height: 30)
                     .background(theme.hover, in: Circle())
             }
             .buttonStyle(.plain)
@@ -119,16 +120,31 @@ struct QuickOpenPanelView: View {
                     .font(.system(size: 11, weight: .medium))
                     .lineLimit(2)
             }
-            .foregroundStyle(warningColor)
+            .foregroundStyle(theme.warning)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(warningColor.opacity(0.08))
+            .padding(.vertical, 9)
+            .background(theme.warning.opacity(0.08))
         }
     }
 
-    private var warningColor: Color {
-        AccentSwatch.orange.interfaceColor
+    @ViewBuilder
+    private var indexMessage: some View {
+        if let message = workspaceStore.quickOpenIndexMessage {
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle.fill")
+                    .font(.system(size: 10, weight: .semibold))
+
+                Text(message)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(2)
+            }
+            .foregroundStyle(theme.textMuted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(theme.hover)
+        }
     }
 
     private var emptyState: some View {

@@ -63,7 +63,7 @@ struct WorkspaceRootView: View {
                         .clipped()
 
                         SidebarResizeHandle(theme: theme)
-                            .frame(width: max(0, 8 * sidebarRevealProgress))
+                            .frame(width: max(0, 14 * sidebarRevealProgress))
                             .opacity(sidebarRevealProgress)
                             .clipped()
                             .allowsHitTesting(sidebarRevealProgress > 0.98)
@@ -151,7 +151,126 @@ struct WorkspaceRootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(theme.canvasBackground)
+        .overlay(alignment: .top) {
+            VStack(spacing: 8) {
+                if let state = workspaceStore.activeTab?.conflictState, state.isBlockingSave {
+                    conflictBanner(state)
+                }
+                if let message = workspaceStore.recoveryMessage {
+                    recoveryBanner(message)
+                }
+                if let message = workspaceStore.openFailureMessage {
+                    noticeBanner(message)
+                }
+            }
+            .padding(.top, 12)
+            .padding(.horizontal, 18)
+        }
         .clipped()
+    }
+
+    private func conflictBanner(_ state: FileConflictState) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(theme.warning)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(state.title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.textPrimary)
+                Text(state.message)
+                    .font(.system(size: 12))
+                    .foregroundStyle(theme.textMuted)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 10)
+
+            Button("Keep Local") {
+                workspaceStore.keepLocalVersionForActiveTab()
+            }
+            .buttonStyle(.borderedProminent)
+
+            Button("Reload") {
+                reloadActiveTabAfterConfirmation()
+            }
+            .buttonStyle(.bordered)
+
+            Button("Save Anyway") {
+                _ = workspaceStore.saveActiveTabIgnoringConflict()
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(theme.elevatedBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(theme.warning.opacity(0.45), lineWidth: 1)
+        )
+        .shadow(color: theme.shadow.opacity(0.12), radius: 16, y: 8)
+    }
+
+    private func recoveryBanner(_ message: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "clock.arrow.circlepath")
+                .foregroundStyle(theme.accent)
+            Text(message)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(theme.textPrimary)
+                .lineLimit(2)
+            Spacer()
+            Button("Restore") {
+                workspaceStore.recoverPendingDrafts()
+            }
+            .buttonStyle(.borderedProminent)
+            Button("Discard") {
+                workspaceStore.discardPendingDrafts()
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(theme.elevatedBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(theme.border, lineWidth: 1)
+        )
+    }
+
+    private func noticeBanner(_ message: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.circle")
+                .foregroundStyle(theme.warning)
+            Text(message)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(theme.textPrimary)
+                .lineLimit(2)
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(theme.elevatedBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(theme.border, lineWidth: 1)
+        )
+    }
+
+    private func reloadActiveTabAfterConfirmation() {
+        guard workspaceStore.activeTab?.isDirty == true else {
+            workspaceStore.reloadActiveTabFromDisk()
+            return
+        }
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Reload from Disk?"
+        alert.informativeText = "Reloading replaces your local unsaved edits with the current file on disk."
+        alert.addButton(withTitle: "Reload")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        workspaceStore.reloadActiveTabFromDisk()
     }
 
     private var preferredColorScheme: ColorScheme? {
@@ -171,18 +290,22 @@ private struct SidebarResizeHandle: View {
     @EnvironmentObject private var workspaceStore: WorkspaceStore
     let theme: PaperTheme
     @State private var dragStartWidth: CGFloat?
+    @FocusState private var focused: Bool
 
     var body: some View {
         ZStack {
             Rectangle()
                 .fill(.clear)
-                .frame(width: 8)
+                .frame(width: 14)
                 .contentShape(Rectangle())
 
             RoundedRectangle(cornerRadius: 999, style: .continuous)
-                .fill(theme.borderStrong.opacity(0.72))
-                .frame(width: 2, height: 44)
+                .fill(focused ? theme.accent : theme.borderStrong.opacity(0.72))
+                .frame(width: focused ? 3 : 2, height: 44)
         }
+        .frame(width: 14)
+        .focusable()
+        .focused($focused)
         .gesture(
             DragGesture(minimumDistance: 1)
                 .onChanged { value in
@@ -195,5 +318,40 @@ private struct SidebarResizeHandle: View {
                     dragStartWidth = nil
                 }
         )
+        .onMoveCommand { direction in
+            guard focused else { return }
+            switch direction {
+            case .left:
+                adjustSidebarWidth(by: -20)
+            case .right:
+                adjustSidebarWidth(by: 20)
+            default:
+                break
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Sidebar Width")
+        .accessibilityValue(sidebarAccessibilityValue)
+        .accessibilityHint("Drag, or use the left and right arrow keys, to resize the sidebar.")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment:
+                adjustSidebarWidth(by: 20)
+            case .decrement:
+                adjustSidebarWidth(by: -20)
+            default:
+                break
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: focused)
+    }
+
+    private var sidebarAccessibilityValue: String {
+        workspaceStore.sidebarWidth == 0 ? "Collapsed" : "\(Int(workspaceStore.sidebarWidth)) points"
+    }
+
+    private func adjustSidebarWidth(by delta: CGFloat) {
+        let baseWidth = workspaceStore.sidebarWidth == 0 ? WorkspaceStore.defaultSidebarWidth : workspaceStore.sidebarWidth
+        workspaceStore.updateSidebarWidth(baseWidth + delta)
     }
 }

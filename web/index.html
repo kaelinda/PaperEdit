@@ -44,8 +44,8 @@
         <p class="requirement" data-i18n="hero.requirement">需要 macOS 14 或更高版本</p>
 
         <div class="mode-switch" role="tablist" aria-label="Preview mode">
-          <button class="active" type="button" role="tab" aria-selected="true" data-preview="source" data-i18n="preview.source">源码</button>
-          <button type="button" role="tab" aria-selected="false" data-preview="preview" data-i18n="preview.preview">预览</button>
+          <button id="source-tab" class="active" type="button" role="tab" aria-selected="true" aria-controls="source-panel" tabindex="0" data-preview="source" data-i18n="preview.source">源码</button>
+          <button id="preview-tab" type="button" role="tab" aria-selected="false" aria-controls="preview-panel" tabindex="-1" data-preview="preview" data-i18n="preview.preview">预览</button>
         </div>
 
         <div class="hero-stage" aria-label="PaperEdit application preview">
@@ -86,7 +86,7 @@
                 <span>settings.json</span>
                 <span>docker-compose.yaml</span>
               </div>
-              <div class="editor-preview source-preview">
+              <div id="source-panel" class="editor-preview source-preview" role="tabpanel" aria-labelledby="source-tab">
                 <div class="line-numbers" aria-hidden="true">1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9</div>
                 <pre><code data-i18n-html="app.sourceCode"><span class="hash">#</span> PaperEdit
 
@@ -99,7 +99,7 @@
 - 收藏、最近、浏览器、快速打开
 </code></pre>
               </div>
-              <div class="editor-preview rendered-preview" hidden>
+              <div id="preview-panel" class="editor-preview rendered-preview" role="tabpanel" aria-labelledby="preview-tab" hidden>
                 <article>
                   <h2>PaperEdit</h2>
                   <p data-i18n="app.renderedCopy">一款面向结构化文本的轻量原生 macOS 编辑器。</p>

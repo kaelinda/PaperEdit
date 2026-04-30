@@ -22,15 +22,6 @@ struct WorkspaceStatusBar: View {
                 if !status.metrics.isEmpty {
                     Text(status.metrics)
                 }
-                separator
-                Label(status.gitBranch, systemImage: "arrow.triangle.branch")
-                separator
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(status.lspOnline ? theme.success : theme.textSubtle)
-                        .frame(width: 6, height: 6)
-                    Text("LSP")
-                }
             }
         }
         .font(.system(size: 11, weight: .medium))
@@ -38,10 +29,7 @@ struct WorkspaceStatusBar: View {
         .padding(.horizontal, 16)
         .frame(height: 28)
         .background {
-            ZStack {
-                VisualEffectBlur(material: .headerView)
-                theme.chromeBackground.opacity(0.92)
-            }
+            LiquidGlassChrome(theme: theme)
         }
         .overlay(alignment: .top) {
             Rectangle()

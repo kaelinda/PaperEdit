@@ -82,8 +82,8 @@ struct WorkspaceSidebar: View {
                     .foregroundStyle(theme.textSubtle)
             }
             .padding(.horizontal, 12)
-            .frame(height: 36)
-            .background(theme.secondaryElevatedBackground, in: Capsule(style: .continuous))
+            .frame(minHeight: 40)
+            .background(LiquidGlassSurface(theme: theme, cornerRadius: 20))
             .overlay(
                 Capsule(style: .continuous)
                     .stroke(workspaceStore.showQuickOpen ? theme.selectedItemStroke : theme.border, lineWidth: 1)
@@ -104,7 +104,9 @@ struct WorkspaceSidebar: View {
         if workspaceStore.sidebarMaterialStyle == .translucent {
             ZStack {
                 VisualEffectBlur(material: .sidebar)
-                theme.sidebarBackground.opacity(0.92)
+                LiquidGlassChrome(theme: theme, material: .sidebar)
+                    .opacity(0.46)
+                theme.sidebarBackground.opacity(0.72)
             }
         } else {
             theme.sidebarBackground
@@ -140,7 +142,7 @@ private struct SidebarSectionView: View {
                 }
                 .foregroundStyle(theme.textMuted)
                 .padding(.horizontal, 8)
-                .frame(minHeight: 30)
+                .frame(minHeight: 34)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("\(section.title) Section")
@@ -178,7 +180,7 @@ private struct SidebarSectionView: View {
                 }
                 .foregroundStyle(theme.textMuted)
                 .padding(.horizontal, 12)
-                .frame(minHeight: 36)
+                .frame(minHeight: 40)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(emptyActionTitle)
@@ -265,7 +267,7 @@ private struct FileTreeNodeRow: View {
                         Image(systemName: workspaceStore.isFavorite(sourceURL) ? "star.fill" : "star")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(workspaceStore.isFavorite(sourceURL) ? theme.accent : theme.textSubtle)
-                            .frame(width: 18, height: 18)
+                            .frame(width: 28, height: 28)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(workspaceStore.isFavorite(sourceURL) ? "Remove \(node.name) from Favorites" : "Add \(node.name) to Favorites")
@@ -274,7 +276,7 @@ private struct FileTreeNodeRow: View {
             .contentShape(Rectangle())
             .padding(.leading, CGFloat(depth) * 13 + 10)
             .padding(.trailing, 10)
-            .frame(minHeight: 34)
+            .frame(minHeight: 38)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(isSelected ? theme.selectedItemFill : .clear)

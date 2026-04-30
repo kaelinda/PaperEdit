@@ -23,6 +23,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         application.reply(toOpenOrPrint: .success)
     }
 
+    func application(_ application: NSApplication, openFile filename: String) -> Bool {
+        open([URL(fileURLWithPath: filename)])
+        return true
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        open(urls)
+    }
+
     private func open(_ urls: [URL]) {
         guard !urls.isEmpty else { return }
         guard let fileOpenHandler else {

@@ -165,18 +165,54 @@ function setLanguage(language) {
   languageToggle.dataset.currentLanguage = language;
 }
 
-switches.forEach((button) => {
-  button.addEventListener("click", () => {
+function selectPreviewTab(button, shouldFocus = false) {
     const showSource = button.dataset.preview === "source";
 
     switches.forEach((item) => {
       const selected = item === button;
       item.classList.toggle("active", selected);
       item.setAttribute("aria-selected", String(selected));
+      item.tabIndex = selected ? 0 : -1;
     });
 
     sourcePreview.hidden = !showSource;
     renderedPreview.hidden = showSource;
+
+    if (shouldFocus) {
+      button.focus();
+    }
+}
+
+switches.forEach((button, index) => {
+  button.addEventListener("click", () => {
+    selectPreviewTab(button);
+  });
+
+  button.addEventListener("keydown", (event) => {
+    const lastIndex = switches.length - 1;
+    let nextIndex = null;
+
+    switch (event.key) {
+      case "ArrowLeft":
+      case "ArrowUp":
+        nextIndex = index === 0 ? lastIndex : index - 1;
+        break;
+      case "ArrowRight":
+      case "ArrowDown":
+        nextIndex = index === lastIndex ? 0 : index + 1;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = lastIndex;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    selectPreviewTab(switches[nextIndex], true);
   });
 });
 
